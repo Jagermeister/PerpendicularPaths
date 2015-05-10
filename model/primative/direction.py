@@ -1,7 +1,3 @@
-#    N = NORTH =  0b00000001
-#    S = SOUTH =  0b00000010
-#    E = EAST =   0b00000100
-#    W = WEST =   0b00001000
 class Direction (object):
     name = ""
     rotate = None

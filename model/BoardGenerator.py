@@ -76,10 +76,10 @@ class BoardGenerator(object):
                 ],
                 self.walls,
                 [
-                    (Point(6,1), [y]),
-                    (Point(1,2), [g]),
-                    (Point(6,5), [b]),
-                    (Point(3,6), [r])
+                    Goal(Point(6,1), [y]),
+                    Goal(Point(1,2), [g]),
+                    Goal(Point(6,5), [b]),
+                    Goal(Point(3,6), [r])
                 ]
              )
         )
@@ -99,10 +99,10 @@ class BoardGenerator(object):
                 ],
                 self.walls,
                 [
-                    (Point(2,1), [y]),
-                    (Point(6,3), [b]),
-                    (Point(4,5), [r]),
-                    (Point(1,6), [g])
+                    Goal(Point(2,1), [y]),
+                    Goal(Point(6,3), [b]),
+                    Goal(Point(4,5), [r]),
+                    Goal(Point(1,6), [g])
                 ]
             )
         )
@@ -122,10 +122,10 @@ class BoardGenerator(object):
                 ],
                 self.walls,
                 [
-                    (Point(1,1), [r]),
-                    (Point(6,2), [g]),
-                    (Point(2,4), [b]),
-                    (Point(7,5), [y])
+                    Goal(Point(1,1), [r]),
+                    Goal(Point(6,2), [g]),
+                    Goal(Point(2,4), [b]),
+                    Goal(Point(7,5), [y])
                 ]
             )
         )
@@ -145,11 +145,11 @@ class BoardGenerator(object):
                 ],
                 self.walls,
                 [
-                    (Point(2,1), [r]),
-                    (Point(1,3), [g]),
-                    (Point(6,4), [y]),
-                    (Point(5,6), [b]),
-                    (Point(3,7), [r,b,y,g])
+                    Goal(Point(2,1), [r]),
+                    Goal(Point(1,3), [g]),
+                    Goal(Point(6,4), [y]),
+                    Goal(Point(5,6), [b]),
+                    Goal(Point(3,7), [r,b,y,g])
                 ]
             )
         )
@@ -172,9 +172,9 @@ class BoardGenerator(object):
             board_bot.append (sections[3].board[x] + sections[2].board[x])
         board_top.extend (board_bot)
         #goals have to have x,y updated based on region
-        goals = sections[0].goals + [(Point(g[0].x, g[0].y + 8), g[1]) for g in sections[1].goals]
-        goals += [(Point(g[0].x + 8, g[0].y + 8), g[1]) for g in sections[2].goals]
-        goals += [(Point(g[0].x + 8, g[0].y), g[1]) for g in sections[3].goals]
+        goals = sections[0].goals + [Goal(Point(g.point.x + 8, g.point.y), g.robots) for g in sections[1].goals]
+        goals += [Goal(Point(g.point.x + 8, g.point.y + 8), g.robots) for g in sections[2].goals]
+        goals += [Goal(Point(g.point.x, g.point.y + 8), g.robots) for g in sections[3].goals]
         return Board(
                 "_".join([str(s.key) for s in sections]),
                 board_top,

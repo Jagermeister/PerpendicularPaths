@@ -8,6 +8,9 @@ class Robot (object):
         assert isinstance(value, int)
         self.value = value
 
+    def __str__ (self):
+        return self.name
+
  	#TODO: This should not know about display
     def bgcolor (self):
         if self.value == 0b00010000:

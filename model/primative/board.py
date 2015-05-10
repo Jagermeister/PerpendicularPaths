@@ -1,12 +1,14 @@
 from primative.point import Point
+from primative.goal import Goal
+
 class Board (object):
-    def __init__(self, key, board, walls, goals):
+    def __init__(self, key, board, walls, goalList):
         self._key = key
         self._board = board
         self._width = len(board)
         self._walls = walls
             #list of blocking directions
-        self._goals = goals
+        self._goals = goalList
 
     def __str__(self):
         return "\tkey: " + str(self._key) + "; width: " + str(self._width) + """;
@@ -51,4 +53,4 @@ class Board (object):
                     for w in self._walls:
                         if c & w.direction.value == w.direction.value:
                             self._board[j][k] += w.direction.rotate.value - w.direction.value
-            self._goals = [(Point(g[0].y, self.width-1-g[0].x), g[1]) for g in self.goals]
+            self._goals = [Goal(Point(self.width-1-g.point.y, g.point.x), g.robots) for g in self.goals]

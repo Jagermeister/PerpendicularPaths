@@ -51,15 +51,16 @@ class PerpendicularPaths:
                         random.randint (0, self.board_section.width - 1),
                         random.randint (0, self.board_section.height - 1)
                     )
-                try_again = False
-                for g in self.board_section.goals:
-                    if g[0] == new_point:
-                        try_again = True
-                        break
-                for r2 in self.robots_starting_location:
-                    if self.robots_starting_location[r2] == new_point:
-                        try_again = True
-                        break
+                if new_point.x not in (7,8) and new_point.y in (7,8):
+                    try_again = False
+                    for g in self.board_section.goals:
+                        if g.point == new_point:
+                            try_again = True
+                            break
+                    for r2 in self.robots_starting_location:
+                        if self.robots_starting_location[r2] == new_point:
+                            try_again = True
+                            break
                 assert robot_placement_attempts < 50
                 robot_placement_attempts += 1
             self.robots_starting_location[r] = new_point
@@ -90,12 +91,12 @@ class PerpendicularPaths:
         print (": move ", end="", flush=True)
         #TODO: this is saying only highlight the text the color of the first robot
         # need to fix for multi goal
-        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15 | goal[1][0].bgcolor())
-        print (goal[1][0].name, end="", flush=True)
+        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15 | goal.robots[0].bgcolor())
+        print (goal.robots[0].name, end="", flush=True)
         windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
         print (" to cell [", end="", flush=True)
         windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15 | 0x0050)
-        print (str(goal[0].x) + "," + str(goal[0].y), end="", flush=True)
+        print (str(goal.point.x) + "," + str(goal.point.y), end="", flush=True)
         windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
         print ("]\r\n\t", end="")
         for r in range (0, self.board_section.width):
@@ -113,7 +114,7 @@ class PerpendicularPaths:
 
                 robot = self.robot_by_cell (point)
                 back_color = 0 if robot is None else robot.bgcolor()
-                if back_color == 0 and goal[0] == point:
+                if back_color == 0 and goal.point == point:
                     back_color = 0x0050
 
                 color = self.space_touched_by_xy (point)
@@ -316,9 +317,8 @@ class PerpendicularPaths:
                 self.display_update()
                 goal = self.board_section.goals[self.goal_index]
                 for r in self.robots:
-                    if r in goal[1]:
-                        goal_robot = self.robots_location[r]
-                        if goal[0] == goal_robot:
+                    if r in goal.robots:
+                        if goal.point == self.robots_location[r]:
                             self.game_state = State.level_complete
                 if self.game_state == State.play:
                     self.display_menu()
