@@ -34,7 +34,7 @@ class PerpendicularPaths:
 
     def board_generate (self):
         g = BoardGenerator()
-        self.board_section = g.generate()
+        self.board_section = g.generate("1_2_3_4")
         self.directions = g.directions
         #TODO: Fix how we know about robots
         self.robots = g.robots

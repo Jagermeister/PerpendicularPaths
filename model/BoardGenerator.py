@@ -1,6 +1,7 @@
 from ctypes import *
 import os
 import copy
+import random
 from primative import *
 
 class BoardGenerator(object):
@@ -154,15 +155,18 @@ class BoardGenerator(object):
             )
         )
 
-    def generate (self):
+    def generate (self, key = None):
         board_top = []
         board_bot = []
-        sections = [
-                copy.copy(self.board_sections[0]),
-                copy.copy(self.board_sections[1]),
-                copy.copy(self.board_sections[2]),
-                copy.copy(self.board_sections[3])
-            ]
+        sections = []
+        if key is None:
+            sections = copy.copy (self.board_sections)
+            random.shuffle (sections)
+            sections = sections[:4]
+        else:
+            for k in key.split("_"):
+                sections.append (copy.copy (next(s for s in self.board_sections if s.key == int(k))))
+
         for i, s in enumerate (sections):
             s.rotate(i)
 
