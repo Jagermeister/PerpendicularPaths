@@ -126,12 +126,9 @@ class PerpendicularPaths:
                     print (".", end="", flush=True)
                 windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
                 
-                if (k + 1) % 8 == 0:
-                #    #RODO: East wall
-                    if c & self.directions[2].value != self.directions[2].value:
-                #        print ("|", end="")
-                #    elif (k + 1) % 16 != 0:
-                        print (" ", end="", flush=True)
+                if (k + 1) % 8 == 0 and c & self.directions[2].value != self.directions[2].value:
+                    #end of board section and there is not an east way
+                    print (" ", end="", flush=True)
                 if (k + 1) % 16 == 0:
                     print ("|", end="")
                     move_count = len(self.move_history)
@@ -222,9 +219,9 @@ class PerpendicularPaths:
             elif robot_direction == "u":
                 if len(self.move_history) > 0:
                     last_move = self.move_history.pop(-1)
-                    self.robot_location_update (last_move[0], last_move[3], last_move[2])
+                    self.robot_location_update (last_move[0], last_move[2])
                     self.space_touched_remove_last()
-                    print ("\tReverted move of " + RR.robot_name(last_move[0]) + " to " + str(last_move[3]))
+                    print ("\tReverted move of " + last_move[0].name + " to " + str(last_move[3]))
                     return
         elif len(robot_direction) == 2:
             #TODO: Fix hardcode
