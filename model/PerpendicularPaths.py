@@ -127,20 +127,21 @@ class PerpendicularPaths:
                 windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
                 
                 if (k + 1) % 8 == 0:
-                    #RODO: East wall
-                    if c & self.directions[2].value == self.directions[2].value:
-                        print ("|", end="")
-                    elif (k + 1) % 16 != 0:
+                #    #RODO: East wall
+                    if c & self.directions[2].value != self.directions[2].value:
+                #        print ("|", end="")
+                #    elif (k + 1) % 16 != 0:
                         print (" ", end="", flush=True)
-                    if (k + 1) % 16 == 0:
-                        move_count = len(self.move_history)
-                        if move_count > 0:
-                            if j == 0:
-                                print ("\tPrevious Moves (" + str(move_count) + "):", end="")
-                            elif move_count >= j:
-                                last_move = self.move_history[-1*j]
-                                print ("\t" + str(move_count-j+1) + ". " + last_move[0].name + " " + last_move[1].name + " from ", end="")
-                                print (last_move[2], end="")
+                if (k + 1) % 16 == 0:
+                    print ("|", end="")
+                    move_count = len(self.move_history)
+                    if move_count > 0:
+                        if j == 0:
+                            print ("\tPrevious Moves (" + str(move_count) + "):", end="")
+                        elif move_count >= j:
+                            last_move = self.move_history[-1*j]
+                            print ("\t" + str(move_count-j+1) + ". " + last_move[0].name + " " + last_move[1].name + " from ", end="")
+                            print (last_move[2], end="")
                     
             print ("")
 

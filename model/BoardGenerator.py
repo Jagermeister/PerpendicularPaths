@@ -175,6 +175,19 @@ class BoardGenerator(object):
             board_top.append (sections[0].board[x] + sections[1].board[x])
             board_bot.append (sections[3].board[x] + sections[2].board[x])
         board_top.extend (board_bot)
+        #patch board walls together
+        for j, r in enumerate (board_top):
+            for k, c in enumerate (r):
+                if (j + 1 < self.board_width - 1 and
+                    board_top[j][k] & self.directions[1].value == self.directions[1].value and
+                    board_top[j+1][k] & self.directions[0].value != self.directions[0].value):
+                    #if the next row is available, make sure we have matching S, N
+                    board_top[j+1][k] += self.directions[0].value
+                if (k + 1 < self.board_width - 1 and
+                    board_top[j][k] & self.directions[2].value == self.directions[2].value and
+                    board_top[j][k+1] & self.directions[3].value != self.directions[3].value):
+                    #if the next col is available, make sure we have matching E, W
+                    board_top[j][k+1] += self.directions[3].value
         #goals have to have x,y updated based on region
         goals = sections[0].goals + [Goal(Point(g.point.x + 8, g.point.y), g.robots) for g in sections[1].goals]
         goals += [Goal(Point(g.point.x + 8, g.point.y + 8), g.robots) for g in sections[2].goals]
