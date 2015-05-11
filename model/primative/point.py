@@ -1,4 +1,4 @@
-from primative.direction import Direction
+from .direction import Direction
 class Point (object):
     x = 0
     y = 0
