@@ -1,4 +1,4 @@
-from primative.point import	Point
+from .point import	Point
 
 class Goal (object):
 	def __init__(self, point, robotList):

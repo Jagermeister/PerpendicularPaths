@@ -1,5 +1,5 @@
-from primative.point import Point
-from primative.goal import Goal
+from .point import Point
+from .goal import Goal
 
 class Board (object):
     def __init__(self, key, board, walls, goalList):
