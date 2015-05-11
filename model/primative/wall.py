@@ -1,4 +1,4 @@
-from primative import Direction
+from .direction import Direction
 class Wall (object):
     name = ""
     direction = None
