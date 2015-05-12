@@ -1,3 +1,5 @@
+import os
+
 class Robot (object):
     name = ""
     value = 0
@@ -14,20 +16,20 @@ class Robot (object):
  	#TODO: This should not know about display
     def bgcolor (self):
         if self.value == 0b00010000:
-            return 0x0040
+            return 0x0040 if os.name == 'nt' else 41
         elif self.value == 0b00100000:
-            return 0x0010
+            return 0x0010 if os.name == 'nt' else 46
         elif self.value == 0b01000000:
-            return 0x0060
+            return 0x0060 if os.name =='nt' else 43
         elif self.value == 0b10000000:
-            return 0x0020
+            return 0x0020 if os.name =='nt' else 42
 
     def fgcolor (self):
         if self.value == 0b00010000:
-            return 12
+            return 12 if os.name =='nt' else 31
         elif self.value == 0b00100000:
-            return 9
+            return 9 if os.name =='nt' else 36
         elif self.value == 0b01000000:
-            return 14
+            return 14 if os.name =='nt' else 33
         elif self.value == 0b10000000:
-            return 10
+            return 10 if os.name =='nt' else 32

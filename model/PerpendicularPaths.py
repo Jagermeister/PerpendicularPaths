@@ -28,6 +28,7 @@ class PerpendicularPaths:
     space_touched = []
         #id, cell, color
     goal_index = 0
+    std_output_hdl = None
 
     def __init__ (self):
         self.game_state = State.menu
@@ -71,34 +72,30 @@ class PerpendicularPaths:
                 return r;
 
     def space_touched_by_xy (self, cell):
-        color = 15
+        color = 15 if os.name == 'nt' else ''
         for i, s in enumerate(self.space_touched):
             if s[1] == cell:
                 color = s[2]
         return color
 
-    def display_update(self):
-        #print (self.rr_board)
-        #WINDOWS SPECIFIC TERMINAL COLORS
+    def color_update (self, color, bgcolor=15 if os.name == 'nt' else 0):
         if os.name == 'nt':
-            STD_OUTPUT_HANDLE_ID = c_ulong(0xfffffff5)
-            windll.Kernel32.GetStdHandle.restype = c_ulong
-            std_output_hdl = windll.Kernel32.GetStdHandle(STD_OUTPUT_HANDLE_ID)
-            windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15 | 0x0050)
+            print ("", end="", flush = True)
+            if self.std_output_hdl is None:
+                STD_OUTPUT_HANDLE_ID = c_ulong(0xfffffff5)
+                windll.Kernel32.GetStdHandle.restype = c_ulong
+                std_output_hdl = windll.Kernel32.GetStdHandle(STD_OUTPUT_HANDLE_ID)
+            windll.Kernel32.SetConsoleTextAttribute(self.std_output_hdl, bgcolor | color)
+        else:
+            print ("\033[" + str(bgcolor) + str(color) + "m", end="")
+
+
+    def display_update(self):
+        #print (self.rr_board)        
         goal = self.board_section.goals[self.goal_index]
-        print ("Goal " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)), end="", flush=True)
-        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
-        print (": move ", end="", flush=True)
-        #TODO: this is saying only highlight the text the color of the first robot
-        # need to fix for multi goal
-        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15 | goal.robots[0].bgcolor())
-        print (goal.robots[0].name, end="", flush=True)
-        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
-        print (" to cell [", end="", flush=True)
-        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15 | 0x0050)
-        print (str(goal.point.x) + "," + str(goal.point.y), end="", flush=True)
-        windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
-        print ("]\r\n\t", end="")
+        print ("Goal " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + 
+            ": move " + goal.robots[0].name + " to cell [" + (str(goal.point.x)) + "," + 
+            str(goal.point.y) + "]\r\n\t", end="")
         for r in range (0, self.board_section.width):
             print (" _", end="")
         print ("")
@@ -108,27 +105,27 @@ class PerpendicularPaths:
                 point = Point (k, j)
                 #TODO: Robot West - draw the board better
                 if c & self.directions[3].value == self.directions[3].value:
-                    print ("|", end="", flush=True)
+                    print ("|", end="")
                 elif k % 8 != 0:# and c & self.E == self.E :
-                    print (" ", end="", flush=True)
+                    print (" ", end="")
 
                 robot = self.robot_by_cell (point)
                 back_color = 0 if robot is None else robot.bgcolor()
                 if back_color == 0 and goal.point == point:
-                    back_color = 0x0050
+                    back_color = 0x0050 if os.name == 'nt' else 45
 
                 color = self.space_touched_by_xy (point)
-                windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, color | back_color)
+                self.color_update (color, back_color)
                 #RODO: South wall
                 if c & self.directions[1].value == self.directions[1].value:
-                    print ("_", end="", flush=True)
+                    print ("_", end="")
                 else:
-                    print (".", end="", flush=True)
-                windll.Kernel32.SetConsoleTextAttribute(std_output_hdl, 15)
+                    print (".", end="")
+                self.color_update (0)
                 
                 if (k + 1) % 8 == 0 and c & self.directions[2].value != self.directions[2].value:
                     #end of board section and there is not an east way
-                    print (" ", end="", flush=True)
+                    print (" ", end="")
                 if (k + 1) % 16 == 0:
                     print ("|", end="")
                     move_count = len(self.move_history)
