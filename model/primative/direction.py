@@ -19,7 +19,7 @@ class Direction (object):
         self.rotate = rotate
 
     def __str__ (self):
-        return self.name
+        return self.name.rjust(5)
 
     def reverse(self):
         assert self.rotate is not None

@@ -3,6 +3,7 @@ import os
 import time
 import random
 from BoardGenerator import *
+from SolutionGenerator import *
 
 class State(object):
     menu = 0b00000001
@@ -17,6 +18,7 @@ class State(object):
 class PerpendicularPaths:
     board_section = None
         #BoardSection
+    solver = None
     game_state = 0
     robots_location = {}
     robots_starting_location = {}
@@ -37,8 +39,12 @@ class PerpendicularPaths:
         g = BoardGenerator()
         self.board_section = g.generate("1_2_3_4")
         self.directions = g.directions
-        #TODO: Fix how we know about robots
         self.robots = g.robots
+        self.solver = SolutionGenerator(
+                self.board_section,
+                self.robots,
+                self.directions
+            )
         self.robots_generate()
         random.shuffle (self.board_section.goals)
         self.board_section = Board (123, self.board_section.board, g.walls, self.board_section.goals[0:5])
@@ -124,7 +130,7 @@ class PerpendicularPaths:
                 self.color_update (0)
                 
                 if (k + 1) % 8 == 0 and c & self.directions[2].value != self.directions[2].value:
-                    #end of board section and there is not an east way
+                    #end of board section and no an east way
                     print (" ", end="")
                 if (k + 1) % 16 == 0:
                     print ("|", end="")
@@ -200,7 +206,7 @@ class PerpendicularPaths:
 \tColor:\t\t [R]ed, [B]lue, [Y]ellow, [G]reen
 \tDirection:\t [N]orth, [S]outh, [E]ast, [W]est
 """ + ("\tExample:\t YS aka move Yellow South\r\n" if self.goal_index == 0 else "") +
-"""\t""" + ("[U]ndo - [R]eset - " if len(self.move_history) > 0 else "") + "[Q]uit\r\n""")
+"""\t""" + ("[U]ndo - [R]eset - " if len(self.move_history) > 0 else "") + "[Q]uit [S]olve\r\n""")
         os.system('cls' if os.name == 'nt' else 'clear')
         robot_direction = robot_direction.lower()
         robot = 0
@@ -220,6 +226,29 @@ class PerpendicularPaths:
                     self.space_touched_remove_last()
                     print ("\tReverted move of " + last_move[0].name + " to " + str(last_move[3]))
                     return
+            elif robot_direction == "s":
+                print ("Solving...")
+                answer = self.solver.generate (
+                        self.robots_location,
+                        self.board_section.goals[self.goal_index],
+                        True
+                    )
+                if answer is not None:
+                    print ("Move", end="\t")
+                    for r in self.robots:
+                        print (r.name, end="\t\t")
+                    print ("")
+                    for i, move in enumerate(answer):
+                        print ("({0:02d}.".format (i), end=" ")
+                        for m in move:
+                            print ("({0:02d},".format (m[0][0]), end=" ")
+                            print ("{0:02d})".format (m[0][1]), end=" ")
+                            if m[1] != 0:
+                                print (next(d for d in self.directions if d.value == m[1]), end="\t")
+                            else:
+                                print ("     ", end="\t")
+                        print ("")
+                return
         elif len(robot_direction) == 2:
             #TODO: Fix hardcode
             if robot_direction[0] == "r":
