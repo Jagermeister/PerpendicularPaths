@@ -18,6 +18,9 @@ class Direction (object):
         assert rotate is None or isinstance(rotate, Direction)
         self.rotate = rotate
 
+    def __str__ (self):
+        return self.name
+
     def reverse(self):
         assert self.rotate is not None
         return self.rotate.rotate

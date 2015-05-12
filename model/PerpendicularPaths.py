@@ -52,7 +52,7 @@ class PerpendicularPaths:
                         random.randint (0, self.board_section.width - 1),
                         random.randint (0, self.board_section.height - 1)
                     )
-                if new_point.x not in (7,8) and new_point.y in (7,8):
+                if new_point.x not in (7,8) and new_point.y not in (7,8):
                     try_again = False
                     for g in self.board_section.goals:
                         if g.point == new_point:
@@ -80,22 +80,19 @@ class PerpendicularPaths:
 
     def color_update (self, color, bgcolor=15 if os.name == 'nt' else 0):
         if os.name == 'nt':
-            print ("", end="", flush = True)
+            print ("", end="", flush=True)
             if self.std_output_hdl is None:
                 STD_OUTPUT_HANDLE_ID = c_ulong(0xfffffff5)
                 windll.Kernel32.GetStdHandle.restype = c_ulong
-                std_output_hdl = windll.Kernel32.GetStdHandle(STD_OUTPUT_HANDLE_ID)
+                self.std_output_hdl = windll.Kernel32.GetStdHandle(STD_OUTPUT_HANDLE_ID)
             windll.Kernel32.SetConsoleTextAttribute(self.std_output_hdl, bgcolor | color)
         else:
             print ("\033[" + str(bgcolor) + str(color) + "m", end="")
 
 
-    def display_update(self):
-        #print (self.rr_board)        
+    def display_update(self):       
         goal = self.board_section.goals[self.goal_index]
-        print ("Goal " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + 
-            ": move " + goal.robots[0].name + " to cell [" + (str(goal.point.x)) + "," + 
-            str(goal.point.y) + "]\r\n\t", end="")
+        print ("Goal " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + ": move " + goal.robots[0].name + " to cell (" + (str(goal.point.x)) + ", " + str(goal.point.y) + ")", end="\r\n\t")
         for r in range (0, self.board_section.width):
             print (" _", end="")
         print ("")
@@ -103,18 +100,21 @@ class PerpendicularPaths:
             print ("\t", end="")
             for k, c in enumerate(r):
                 point = Point (k, j)
-                #TODO: Robot West - draw the board better
                 if c & self.directions[3].value == self.directions[3].value:
                     print ("|", end="")
-                elif k % 8 != 0:# and c & self.E == self.E :
+                elif k % 8 != 0:
                     print (" ", end="")
 
                 robot = self.robot_by_cell (point)
-                back_color = 0 if robot is None else robot.bgcolor()
-                if back_color == 0 and goal.point == point:
-                    back_color = 0x0050 if os.name == 'nt' else 45
+                back_color = 0
+                color = 15
+                if robot is None:
+                    color = self.space_touched_by_xy (point)
+                    if goal.point == point:
+                        back_color = 0x0050 if os.name == 'nt' else 45
+                else:
+                    back_color = robot.bgcolor()
 
-                color = self.space_touched_by_xy (point)
                 self.color_update (color, back_color)
                 #RODO: South wall
                 if c & self.directions[1].value == self.directions[1].value:
