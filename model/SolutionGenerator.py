@@ -1,126 +1,125 @@
 from primative import *
 import time
 import copy
+import itertools
+from collections import deque
 
 class SolutionGenerator (object):
-    board_section = None
+    direction_reverse = {}
+    direction_delta = {}
 
     def __init__ (self, boardsection, robots, directions):
-        self.board_section = boardsection
-        self.robot_objects = robots
+        self.board = list(itertools.chain.from_iterable(boardsection._board))
+        self.robot_objects = copy.deepcopy (robots)
         self.directions = directions
-
-    def is_winning (self, node, goal):
-        for i, r in enumerate (self.robot_objects):
-            for gr in goal.robots:
-                if (gr.value & r.value == r.value and 
-                    goal.point.x == node[i][0][0] and 
-                    goal.point.y == node[i][0][1]
-                ):
-                    return True
-        return False
+        self.direction_reverse = {
+                0b00000001: 0b00000010,
+                0b00000010: 0b00000001,
+                0b00000100: 0b00001000,
+                0b00001000: 0b00000100,
+            }
+        self.direction_delta = {
+                0b00000001: -16,
+                0b00000010: +16,
+                0b00000100: +1,
+                0b00001000: -1,
+            }
 
     def node_to_int (self, node):
-        #RED1RED2BLU1BLU2YEL1YEL2GRE1GRE2
-        answer = 0
-        for i, r in enumerate (self.robot_objects):
-            if r.name == "Red":
-                answer |= (node[i][0][0] << 28 | node[i][0][1] << 24)
-            elif r.name == "Blue":
-                answer |= (node[i][0][0] << 20 | node[i][0][1] << 16)
-            elif r.name == "Yellow":
-                answer |= (node[i][0][0] << 12 | node[i][0][1] << 8)
-            elif r.name == "Green":
-                answer |= (node[i][0][0] << 4 | node[i][0][1])
-        return answer
+        first, second, third = node[0][0], node[1][0], node[2][0]
+        if first > second:
+            first, second = second, first
+        if second > third:
+            second, third = third, second
+        if first > second:
+            first, second = second, first
+        return node[3][0] | first << 8 | second << 16 | third << 24
 
-    def cell_advance (self, cell, direction):
-        if direction == 0b00000001:
-            return (cell[0], cell[1]-1)
-        elif direction == 0b00000010:
-            return (cell[0], cell[1]+1)
-        elif direction == 0b00000100:
-            return (cell[0]+1, cell[1])
-        elif direction == 0b00001000:
-            return (cell[0]-1, cell[1])
-
-    def direction_reverse (self, direction):
-        if direction == 0b00000001:
-            return 0b00000010
-        elif direction == 0b00000010:
-            return 0b00000001
-        elif direction == 0b00000100:
-            return 0b00001000
-        elif direction == 0b00001000:
-            return 0b00000100
-
-    def cell_move (self, cell, direction, node):
-        advanced_cell = self.cell_advance (cell, direction)
-        if ((advanced_cell[0] < 0 or advanced_cell[0] > 15) or
-            (advanced_cell[1] < 0 or advanced_cell[1] > 15)):
-            #Moving would put us out of bounds
-            return cell
-        if self.board_section.board[cell[1]][cell[0]] & direction == direction:
-            #Wall in cell stopping us
-            return cell
-        if self.board_section.board[advanced_cell[1]][advanced_cell[0]] & self.direction_reverse (direction) == self.direction_reverse (direction):
-            #Wall in next cell stopping us
-            return cell
-        for r in node:
-            if advanced_cell == r[0]:
-                return cell
-        return self.cell_move (advanced_cell, direction, node)
+    def cell_move (self, index, direction, node):
+        while True:
+            if self.board[index] & direction == direction:
+                break
+            advanced_index = index + self.direction_delta[direction]
+            for r in node:
+                if advanced_index == r[0]:
+                    break
+            else:
+                index = advanced_index
+                continue
+            break
+        return index
 
     def moves_from_robots (self, node):
-        moves = []
+        moves = deque()
         for i, r in enumerate(self.robot_objects):
             for d in self.directions:
-                if node[i][1] not in (d.value, d.reverse().value):
-                    new_cell = self.cell_move (node[i][0], d.value, node)
+                if node[i][1] not in (d.value, self.direction_reverse[d.value]):
+                    new_cell = node[i][0]
+                    advanced_index = 0
+                    while True:
+                        if self.board[new_cell] & d.value == d.value:
+                            break
+                        advanced_index = new_cell + self.direction_delta[d.value]
+                        for r in node:
+                            if advanced_index == r[0]:
+                                break
+                        else:
+                            new_cell = advanced_index
+                            continue
+                        break
                     if node[i][0] != new_cell:
                         updated_robots = copy.copy (node)
                         updated_robots[i] = (new_cell, d.value)
                         moves.append (updated_robots)
-        #self.printList (moves)
-        #input ("self.printList (moves)")
         return moves
 
-    def printList(self, path):
-        for r in self.robot_objects:
-            print (r.name + "\t", end="")
-        print ("")
-        for robotList in path:
-            print ("[", end="")
-            for r in robotList:
-                print (r, end=" ")
-            print ("]")
-
-    def generate (self, robots, goal, verbose=False):
+    def generate (self, robots, goal, directions=None, verbose=False):
         #robots = dictionary key robot value point
+        assert len(robots) == 4
         #goal = list of goals
+        assert len(goal.robots) == 1#multi goal not supported
+        #directions = list of last direction values or 0 for none
         time_start = time.clock()
+        for i, r in enumerate (self.robot_objects):
+            if r.value == goal.robots[0].value:
+                self.robot_objects.append (self.robot_objects.pop(i))
+        #reorder our robots - put the goal robot last @ [3]
+        if directions is not None:
+            assert len(directions) == len(robots)
+        else:
+            directions = [0] * len(robots)
         start_position = list(
-                [   ((robots[r].x, robots[r].y), 0)
-                    for ro in self.robot_objects 
+                [   (robots[r].y * 16 + robots[r].x, directions[i])
+                    for i, ro in enumerate(self.robot_objects)
                         for r in robots 
-                            if ro == r]
+                            if ro.value == r.value]
             )
-        #flatten into ((x, y), direction.value)
+        goal_index = goal.point.y * 16 + goal.point.x
+        for d in self.directions:
+            new_cell = self.cell_move (goal_index, d.value, [])
+            if new_cell != goal_index:
+                if d.value in (4,8):#EorW
+                    minx = new_cell if new_cell < goal_index else goal_index
+                    maxx = new_cell if new_cell > goal_index else goal_index
+                elif d.value in (1,2):#NorS
+                    miny = new_cell if new_cell < goal_index else goal_index
+                    maxy = new_cell if new_cell > goal_index else goal_index
+        minymod = miny % 16
         positions_seen = {}
-        #directary of seen positions to remove cycle
+        #directary of seen positions
         path_length = 1
         total_seen_count = 0
         seen_count = 0
         skipped_count = 0
-        queue = []
+        queue = deque()
         queue.append ([start_position])
         while queue:
-            path = queue.pop(0)
+            path = queue.popleft()
             node = path[-1]
             if len(path) != path_length:
                 if verbose:
                     print (
-                            "{0:02d}".format (path_length) + " - " + 
+                            "{0:02d}".format (path_length-1) + " - " + 
                             "{0:05d}".format (seen_count) + "\t sk: " + 
                             "{0:05d}".format (skipped_count) + "\t@ " + 
                             str(time.clock() - time_start) + "s"
@@ -129,18 +128,33 @@ class SolutionGenerator (object):
                 total_seen_count += seen_count
                 seen_count = 0
             seen_count += 1
-            if self.is_winning (node, goal):
+            if (
+                (goal_index == node[3][0]) or
+                (maxx >= node[3][0] >= minx) or
+                (maxy >= node[3][0] >= miny and node[3][0] % 16 == minymod)
+            ):
                 total_seen_count += seen_count
                 if verbose:
                     print ("\tanswer found in " + str(time.clock() - time_start) + "s")
-                    print ("\tL" + str(path_length) + " - seen:" + str(seen_count) + "; skipped: " + str(skipped_count) + "; total seen: " + str(total_seen_count))
+                    print (
+                            "\tL" + str(path_length-1) + 
+                            " - total seen:" + str(total_seen_count) + 
+                            "; skipped: " + str(skipped_count) + 
+                            "; cache: " + str(len(positions_seen))
+                        )
                 return path
             for adjacent in self.moves_from_robots (node):
-                key = self.node_to_int(adjacent)
-                val = positions_seen.get (key)
-                if val is None:
+                first = adjacent[0][0]; second = adjacent[1][0]; third = adjacent[2][0]
+                if first > second:
+                    first, second = second, first
+                if second > third:
+                    second, third = third, second
+                if first > second:
+                    first, second = second, first
+                key = adjacent[3][0] | first << 8 | second << 16 | third << 24
+                if positions_seen.get (key) is None:
                     positions_seen[key] = True
-                    new_path = list (path)
+                    new_path = deque(list (path))
                     new_path.append(adjacent)
                     queue.append(new_path)
                 else:

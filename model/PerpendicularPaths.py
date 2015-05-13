@@ -145,18 +145,11 @@ class PerpendicularPaths:
             print ("")
 
     def cell_move (self, point, direction, robot, space_touched_id):
-        advanced_cell = copy.copy (point)
-        advanced_cell.move (direction)
-        if ((advanced_cell.x < 0 or advanced_cell.x > 15) or
-            (advanced_cell.y < 0 or advanced_cell.y > 15)):
-            #Moving would put us out of bounds
-            return point
         if self.board_section.board_value (point) & direction.value == direction.value:
             #Wall in point stopping us
             return point
-        if self.board_section.board_value (advanced_cell) & direction.reverse().value == direction.reverse().value:
-            #Wall in next point stopping us
-            return point
+        advanced_cell = copy.copy (point)
+        advanced_cell.move (direction)
         for r in self.robots_location:
             if advanced_cell == self.robots_location[r]:
                 #blocked by robot in next point
@@ -177,7 +170,7 @@ class PerpendicularPaths:
     def robot_move (self, robot, direction):
         last_robot_move = self.move_history_by_robot (robot)
         if last_robot_move is not None and (last_robot_move[1] == direction or last_robot_move[1] == direction.reverse()):
-            print ("ROBOT MUST RICOCHET!")
+            print ("MUST MOVE PERPENDICULAR!")
             return
         if len(self.space_touched) > 0:
             last_space_touched_id = self.space_touched[-1][0] + 1
@@ -204,8 +197,8 @@ class PerpendicularPaths:
         robot_direction = input ("""\r\nMove with two characters:
 \tColor:\t\t [R]ed, [B]lue, [Y]ellow, [G]reen
 \tDirection:\t [N]orth, [S]outh, [E]ast, [W]est
-""" + ("\tExample:\t YS aka move Yellow South\r\n" if self.goal_index == 0 else "") +
-"""\t""" + ("[U]ndo - [R]eset - " if len(self.move_history) > 0 else "") + "[Q]uit - [S]olve - [N]ew game\r\n""")
+\t""" + ("[U]ndo - [R]eset " if len(self.move_history) > 0 else "\t\t ") + 
+("[S]olve - " if len((self.board_section.goals[self.goal_index]).robots) == 1 else "") + "[N]ew Game - [Q]uit\r\n""")
         os.system('cls' if os.name == 'nt' else 'clear')
         robot_direction = robot_direction.lower()
         robot = 0
@@ -225,23 +218,31 @@ class PerpendicularPaths:
                     self.space_touched_remove_last()
                     print ("\tReverted move of " + last_move[0].name + " to " + str(last_move[3]))
                     return
-            elif robot_direction == "s":
+            elif robot_direction == "s" and len(self.board_section.goals[self.goal_index].robots) == 1:
                 print ("Solving...")
+                directions = []
+                for r in self.robots:
+                    lastmove = self.move_history_by_robot (r)
+                    if lastmove is not None:
+                        directions.append (lastmove[1].value)
+                    else:
+                        directions.append (0)
                 answer = self.solver.generate (
                         self.robots_location,
                         self.board_section.goals[self.goal_index],
+                        directions,
                         True
                     )
                 if answer is not None:
                     print ("Move", end="\t")
-                    for r in self.robots:
+                    for r in self.solver.robot_objects:
                         print (r.name, end="\t\t")
                     print ("")
                     for i, move in enumerate(answer):
                         print ("({0:02d}.".format (i), end=" ")
                         for m in move:
-                            print ("({0:02d},".format (m[0][0]), end=" ")
-                            print ("{0:02d})".format (m[0][1]), end=" ")
+                            print ("({0:02d},".format (m[0] % 16), end=" ")
+                            print ("{0:02d})".format (int(m[0] / 16)), end=" ")
                             if m[1] != 0:
                                 print (next(d for d in self.directions if d.value == m[1]), end="\t")
                             else:
@@ -321,7 +322,7 @@ class PerpendicularPaths:
                 print ("\t!Level " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + " completed in " + str(len(self.move_history)) + " moves, " + str(time.clock() - level_starttime) + " seconds!")
                 print ("\t!You touched " + str(len(self.space_touched)) + " spaces!")
                 print ("Next level loading...", end="", flush=True)
-                for i in range (1, 24):# if self.goal_index == 0 else 18):
+                for i in range (1, 24):
                     time.sleep (0.33)
                     print (".", end="", flush=True)
                 os.system('cls' if os.name == 'nt' else 'clear')
