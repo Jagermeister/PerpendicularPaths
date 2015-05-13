@@ -113,7 +113,7 @@ class PerpendicularPaths:
 
                 robot = self.robot_by_cell (point)
                 back_color = 0
-                color = 15
+                color = 15 if os.name == 'nt' else ''
                 if robot is None:
                     color = self.space_touched_by_xy (point)
                     if goal.point == point:
