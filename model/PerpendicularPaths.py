@@ -6,9 +6,7 @@ from BoardGenerator import *
 from SolutionGenerator import *
 
 class State(object):
-    menu = 0b00000001
     play = 0b00000010
-    option = 0b00000100
     gg = 0b00010000
     level_restart = 0b00100000
     level_complete = 0b10000000
@@ -33,7 +31,7 @@ class PerpendicularPaths:
     std_output_hdl = None
 
     def __init__ (self):
-        self.game_state = State.menu
+        self.game_state = State.game_restart
 
     def board_generate (self):
         g = BoardGenerator()
@@ -50,6 +48,7 @@ class PerpendicularPaths:
         self.board_section = Board (123, self.board_section.board, g.walls, self.board_section.goals[0:5])
 
     def robots_generate(self):
+        self.robots_starting_location = {}
         for r in self.robots:
             robot_placement_attempts = 0
             try_again = True
@@ -206,7 +205,7 @@ class PerpendicularPaths:
 \tColor:\t\t [R]ed, [B]lue, [Y]ellow, [G]reen
 \tDirection:\t [N]orth, [S]outh, [E]ast, [W]est
 """ + ("\tExample:\t YS aka move Yellow South\r\n" if self.goal_index == 0 else "") +
-"""\t""" + ("[U]ndo - [R]eset - " if len(self.move_history) > 0 else "") + "[Q]uit [S]olve\r\n""")
+"""\t""" + ("[U]ndo - [R]eset - " if len(self.move_history) > 0 else "") + "[Q]uit - [S]olve - [N]ew game\r\n""")
         os.system('cls' if os.name == 'nt' else 'clear')
         robot_direction = robot_direction.lower()
         robot = 0
@@ -249,6 +248,9 @@ class PerpendicularPaths:
                                 print ("     ", end="\t")
                         print ("")
                 return
+            elif robot_direction == "n":
+                self.game_state = State.game_restart
+                return
         elif len(robot_direction) == 2:
             #TODO: Fix hardcode
             if robot_direction[0] == "r":
@@ -275,34 +277,6 @@ class PerpendicularPaths:
         else:
             print ("\t**Command '" + robot_direction + "' is not recognized!**\r\n")
 
-    def top_menu(self):
-        print ("""
-  |\_/|        ****************************    (\_/)
- / @ @ \       *  "Purrrfectly pleasant"  *   (='.'=)
-( > º < )      *   Perpendicular Paths    *   (")_(")
- `>>x<<`       *                          *
- /  O  \       ****************************
-""")
-
-    def bot_menu(self):
-        print ("""
-\t               )\._.,--....,'``.
-\t .b--.        /;   _.. \   _\  (`._ ,.
-\t`=,-,-'~~~   `----(,_..'--(,_..'`-.;.'
-""")
-
-    def play_menu(self):
-        self.top_menu()
-        print ("Press [P] to Play!")
-        self.bot_menu()
-        answer = input ()
-        if len(answer) == 1 and answer.lower() == "p":
-            self.game_state = State.game_restart
-            os.system('cls' if os.name == 'nt' else 'clear')
-            return
-        else:
-            self.game_state = State.gg
-
     def new_level(self):
         self.move_history = []
         self.space_touched = []
@@ -323,12 +297,7 @@ class PerpendicularPaths:
         playing = True
         level_starttime = 0
         while playing:
-            if self.game_state == State.menu:
-                os.system('cls' if os.name == 'nt' else 'clear')
-                self.play_menu()
-            elif self.game_state == State.option:
-                self.game_state = State.play
-            elif self.game_state == State.game_restart:
+            if self.game_state == State.game_restart:
                 os.system('cls' if os.name == 'nt' else 'clear')
                 self.new_game()
                 self.game_state = State.play
@@ -371,7 +340,7 @@ class PerpendicularPaths:
                 print ("Game completed - " + str(self.goal_index) + " level(s) in " + str(self.game_move_count) + " moves, " + str(self.game_time_count) + " seconds!")
                 print ("You touched " + str(self.game_space_touched_count) + " spaces!")
                 if input ("\t[P]lay again?\r\n").lower() == "p":
-                    self.game_state = State.menu
+                    self.game_state = State.game_restart
                 else:
                     playing = False
             elif self.game_state == State.gg:
