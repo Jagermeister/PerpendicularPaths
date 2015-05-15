@@ -17,6 +17,7 @@ class PerpendicularPaths:
     board_section = None
         #BoardSection
     solver = None
+    boardgenerator = None
     game_state = 0
     robots_location = {}
     robots_starting_location = {}
@@ -32,12 +33,12 @@ class PerpendicularPaths:
 
     def __init__ (self):
         self.game_state = State.game_restart
+        self.boardgenerator = BoardGenerator()
 
     def board_generate (self):
-        g = BoardGenerator()
-        self.board_section = g.generate("1_2_3_4")
-        self.directions = g.directions
-        self.robots = g.robots
+        self.board_section = self.boardgenerator.generate("1_2_3_4")
+        self.directions = self.boardgenerator.directions
+        self.robots = self.boardgenerator.robots
         self.solver = SolutionGenerator(
                 self.board_section,
                 self.robots,
@@ -45,7 +46,12 @@ class PerpendicularPaths:
             )
         self.robots_generate()
         random.shuffle (self.board_section.goals)
-        self.board_section = Board (123, self.board_section.board, g.walls, self.board_section.goals[0:5])
+        self.board_section = Board (
+                123, 
+                self.board_section.board, 
+                self.boardgenerator.walls, 
+                self.board_section.goals[0:5]
+            )
 
     def robots_generate(self):
         self.robots_starting_location = {}
@@ -221,7 +227,7 @@ class PerpendicularPaths:
             elif robot_direction == "s" and len(self.board_section.goals[self.goal_index].robots) == 1:
                 print ("Solving...")
                 directions = []
-                for r in self.robots:
+                for r in self.robots_location:
                     lastmove = self.move_history_by_robot (r)
                     if lastmove is not None:
                         directions.append (lastmove[1].value)
