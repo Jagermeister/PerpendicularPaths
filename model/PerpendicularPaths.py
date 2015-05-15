@@ -183,9 +183,16 @@ class PerpendicularPaths:
         else:
             last_space_touched_id = 0
         point = self.robots_location[robot]
+        goal = self.board_section.goals[self.goal_index]
         new_cell = self.cell_move (point, direction, robot, last_space_touched_id)
-        if (point == new_cell):
+        if point == new_cell:
             print ("CAN NOT MOVE IN THAT DIRECTION")
+        elif (  last_robot_move is None and 
+                new_cell == goal.point and
+                robot in goal.robots
+        ):
+            print ("MUST MOVE PERPENDICULAR BEFORE GOAL")
+            self.space_touched_remove_last()
         else:
             print ("\t" + robot.name + " moved to ", end="")
             print (str(new_cell) + " from " + str(point))

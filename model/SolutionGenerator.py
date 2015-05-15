@@ -49,11 +49,12 @@ class SolutionGenerator (object):
             break
         return index
 
-    def moves_from_robots (self, node):
+    def moves_from_robots (self, node, goal_index):
         moves = deque()
         for i, r in enumerate(self.robot_objects):
             for d in self.directions:
                 if node[i][1] not in (d.value, self.direction_reverse[d.value]):
+                    #ricochet rule
                     new_cell = node[i][0]
                     advanced_index = 0
                     while True:
@@ -67,7 +68,12 @@ class SolutionGenerator (object):
                             new_cell = advanced_index
                             continue
                         break
-                    if node[i][0] != new_cell:
+                    if (node[i][0] != new_cell and not (
+                            i == 3 and
+                            node[i][1] == 0 and
+                            new_cell == goal_index
+                        )
+                    ):
                         updated_robots = copy.copy (node)
                         updated_robots[i] = (new_cell, d.value)
                         moves.append (updated_robots)
@@ -132,8 +138,12 @@ class SolutionGenerator (object):
             seen_count += 1
             if (
                 (goal_index == node[3][0]) or
-                (maxx >= node[3][0] >= minx) or
-                (maxy >= node[3][0] >= miny and node[3][0] % 16 == minymod)
+                (
+                    (
+                        (node[3][1] in (1,2) and maxx >= node[3][0] >= minx) or
+                        (node[3][1] in (3,4) and maxy >= node[3][0] >= miny and node[3][0] % 16 == minymod)
+                    )
+                )
             ):
                 total_seen_count += seen_count
                 if verbose:
@@ -145,7 +155,7 @@ class SolutionGenerator (object):
                             "; cache: " + str(len(positions_seen))
                         )
                 return path
-            for adjacent in self.moves_from_robots (node):
+            for adjacent in self.moves_from_robots (node, goal_index):
                 first = adjacent[0][0]; second = adjacent[1][0]; third = adjacent[2][0]
                 if first > second:
                     first, second = second, first
