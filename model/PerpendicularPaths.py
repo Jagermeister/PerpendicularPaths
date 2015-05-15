@@ -313,7 +313,7 @@ class PerpendicularPaths:
                 self.game_state = State.play
             elif self.game_state == State.play:
                 if level_starttime == 0:
-                    level_starttime = time.clock()
+                    level_starttime = time.time()
                 self.display_update()
                 goal = self.board_section.goals[self.goal_index]
                 for r in self.robots:
@@ -323,16 +323,16 @@ class PerpendicularPaths:
                 if self.game_state == State.play:
                     self.display_menu()
             elif self.game_state == State.level_complete:
-                self.game_time_count += time.clock() - level_starttime
+                self.game_time_count += time.time() - level_starttime
                 print ("\r\nCONGRATS!!!")
-                print ("\t!Level " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + " completed in " + str(len(self.move_history)) + " moves, " + str(time.clock() - level_starttime) + " seconds!")
+                print ("\t!Level " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + " completed in " + str(len(self.move_history)) + " moves, " + str(time.time() - level_starttime) + " seconds!")
                 print ("\t!You touched " + str(len(self.space_touched)) + " spaces!")
                 print ("Next level loading...", end="", flush=True)
                 for i in range (1, 24):
                     time.sleep (0.33)
                     print (".", end="", flush=True)
                 os.system('cls' if os.name == 'nt' else 'clear')
-                level_starttime = time.clock()
+                level_starttime = time.time()
                 self.game_move_count += len(self.move_history)
                 self.game_space_touched_count += len(self.space_touched)
                 self.robots_starting_location = {}
