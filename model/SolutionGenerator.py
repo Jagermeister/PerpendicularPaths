@@ -84,14 +84,15 @@ class SolutionGenerator (object):
             assert len(directions) == len(robots)
         else:
             directions = [0] * len(robots)
+        #reorganize goal object last
         for i, r in enumerate (self.robot_objects):
             if r.value == goal.robots[0].value:
                 self.robot_objects.append (self.robot_objects.pop(i))
-                directions.append (directions.pop(i))
+                break
         start_position = list(
-                [   (robots[r].y * 16 + robots[r].x, directions[i])
+                [   (robots[r].y * 16 + robots[r].x, directions[ii])
                     for i, ro in enumerate(self.robot_objects)
-                        for r in robots 
+                        for ii, r in enumerate(robots) 
                             if ro.value == r.value]
             )
         #reorder our robots - put the goal robot last @ [3]
