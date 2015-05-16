@@ -98,7 +98,7 @@ class PerpendicularPaths:
                 self.std_output_hdl = windll.Kernel32.GetStdHandle(STD_OUTPUT_HANDLE_ID)
             windll.Kernel32.SetConsoleTextAttribute(self.std_output_hdl, bgcolor | color)
         else:
-            print ("\033[" + str(bgcolor) + str(color) + "m", end="")
+            print ("\033[" + str(bgcolor) + ";" + str(color) + "m", end="")
 
 
     def display_update(self):       
@@ -118,11 +118,12 @@ class PerpendicularPaths:
 
                 robot = self.robot_by_cell (point)
                 back_color = 0
-                color = 15 if os.name == 'nt' else ''
+                color = 15 if os.name == 'nt' else '30'
                 if robot is None:
-                    color = self.space_touched_by_xy (point)
                     if goal.point == point:
                         back_color = 0x0050 if os.name == 'nt' else 45
+                    else:
+                        color = self.space_touched_by_xy (point) 
                 else:
                     back_color = robot.bgcolor()
 
