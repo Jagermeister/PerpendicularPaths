@@ -171,3 +171,10 @@ class SolutionGenerator (object):
                     queue.append(new_path)
                 else:
                     skipped_count += 1
+        print ("\tanswer NOT found in " + str(time.clock() - time_start) + "s")
+        print (
+                "\tL" + str(path_length-1) + 
+                " - total seen:" + str(total_seen_count) + 
+                "; skipped: " + str(skipped_count) + 
+                "; cache: " + str(len(positions_seen))
+            ) 
