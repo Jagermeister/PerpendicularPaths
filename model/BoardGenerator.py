@@ -12,10 +12,6 @@ class BoardGenerator(object):
 
     board_sections = []
 
-    walls = []
-    directions = []
-    robots = []
-
     def __init__ (self):
         n = Shared.N.value
         s = Shared.S.value
@@ -71,26 +67,6 @@ class BoardGenerator(object):
                     self.board_sections.append (board)
 
         assert len(self.board_sections) >= 4
-        self.directions = [
-                Shared.N,
-                Shared.S,
-                Shared.E,
-                Shared.W
-            ]
-
-        self.walls = [
-                Wall ("North", Shared.N),
-                Wall ("South", Shared.S),
-                Wall ("East", Shared.E),
-                Wall ("West", Shared.W)
-            ]
-
-        self.robots = [
-                Shared.R,
-                Shared.B,
-                Shared.Y,
-                Shared.G
-            ]
 
     def generate (self, key=None):
         board_top = []

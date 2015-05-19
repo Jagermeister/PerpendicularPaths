@@ -37,8 +37,8 @@ class PerpendicularPaths:
 
     def board_generate (self, seed=None):
         self.board_section = self.boardgenerator.generate(seed)
-        self.directions = self.boardgenerator.directions
-        self.robots = self.boardgenerator.robots
+        self.directions = Shared.DIRECTIONS
+        self.robots = Shared.ROBOTS
         self.solver = SolutionGenerator(
                 self.board_section,
                 self.robots,
@@ -47,7 +47,7 @@ class PerpendicularPaths:
         self.robots_generate()
         random.shuffle (self.board_section.goals)
         self.board_section = Board (
-                self.board_section.key, 
+                self.board_section.key,
                 self.board_section.board,
                 self.board_section.goals[0:5]
             )
