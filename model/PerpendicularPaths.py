@@ -35,8 +35,8 @@ class PerpendicularPaths:
         self.game_state = State.game_restart
         self.boardgenerator = BoardGenerator()
 
-    def board_generate (self):
-        self.board_section = self.boardgenerator.generate("1_2_3_4")
+    def board_generate (self, seed=None):
+        self.board_section = self.boardgenerator.generate(seed)
         self.directions = self.boardgenerator.directions
         self.robots = self.boardgenerator.robots
         self.solver = SolutionGenerator(
@@ -47,9 +47,8 @@ class PerpendicularPaths:
         self.robots_generate()
         random.shuffle (self.board_section.goals)
         self.board_section = Board (
-                123, 
-                self.board_section.board, 
-                self.boardgenerator.walls, 
+                self.board_section.key, 
+                self.board_section.board,
                 self.board_section.goals[0:5]
             )
 
@@ -150,6 +149,7 @@ class PerpendicularPaths:
                             print (last_move[2], end="")
                     
             print ("")
+        print ("SEED: " + self.board_section.key)
 
     def cell_move (self, point, direction, robot, space_touched_id):
         if self.board_section.board_value (point) & direction.value == direction.value:
@@ -299,9 +299,9 @@ class PerpendicularPaths:
         for r in self.robots_starting_location:
             self.robots_location[r] = self.robots_starting_location[r]
 
-    def new_game(self):
+    def new_game(self, seed=None):
         os.system('cls' if os.name == 'nt' else 'clear')
-        self.board_generate()
+        self.board_generate(seed)
         self.goal_index = 0
         self.game_move_count = 0
         self.game_time_count = 0
@@ -314,7 +314,16 @@ class PerpendicularPaths:
         while playing:
             if self.game_state == State.game_restart:
                 os.system('cls' if os.name == 'nt' else 'clear')
-                self.new_game()
+                print ("SEED?")
+                print ("\tLeave blank for random generation")
+                print ("\t'L' for last seed")
+                seed = input("")
+                if seed.upper() == "L":
+                    if self.board_section is None:
+                        seed = None
+                    else:
+                        seed = self.board_section.key
+                self.new_game(seed if seed != "" else None)
                 self.game_state = State.play
             elif self.game_state == State.level_restart:
                 self.new_level()

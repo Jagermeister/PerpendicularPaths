@@ -4,3 +4,4 @@ from .goal import *
 from .board import *
 from .robot import *
 from .wall import *
+from .shared import *
