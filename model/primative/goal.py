@@ -1,5 +1,4 @@
 from .point import	Point
-import copy
 
 class Goal (object):
 	def __init__(self, point, robotList):
@@ -14,9 +13,3 @@ class Goal (object):
 			stringout += r.__str__()
 		stringout += " at " + self.point.__str__()
 		return stringout
-
-	def __deepcopy__(self, memo):
-		return Goal (
-				copy.deepcopy (self.point),
-				self.robots
-			)

@@ -1,4 +1,5 @@
 import os
+import copy
 
 class Robot (object):
     name = ""
@@ -12,6 +13,9 @@ class Robot (object):
 
     def __str__ (self):
         return self.name
+
+    def __deepcopy__(self, memo):
+        return self
 
  	#TODO: This should not know about display
     def bgcolor (self):
