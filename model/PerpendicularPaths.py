@@ -310,9 +310,9 @@ class PerpendicularPaths:
 
     def play_game(self):
         playing = True
-        level_starttime = 0
         while playing:
             if self.game_state == State.game_restart:
+                level_starttime = 0
                 os.system('cls' if os.name == 'nt' else 'clear')
                 print ("SEED?")
                 print ("\tLeave blank for random generation")
@@ -341,13 +341,10 @@ class PerpendicularPaths:
                     self.display_menu()
             elif self.game_state == State.level_complete:
                 self.game_time_count += time.time() - level_starttime
-                print ("\r\nCONGRATS!!!")
+                print ("\r\nCONGRATS!")
                 print ("\t!Level " + str(self.goal_index+1) + " of " + str(len(self.board_section.goals)) + " completed in " + str(len(self.move_history)) + " moves, " + str(time.time() - level_starttime) + " seconds!")
                 print ("\t!You touched " + str(len(self.space_touched)) + " spaces!")
-                print ("Next level loading...", end="", flush=True)
-                for i in range (1, 24):
-                    time.sleep (0.33)
-                    print (".", end="", flush=True)
+                input ("Ready for next level ???")
                 os.system('cls' if os.name == 'nt' else 'clear')
                 level_starttime = time.time()
                 self.game_move_count += len(self.move_history)
@@ -366,15 +363,8 @@ class PerpendicularPaths:
                 if input ("\t[P]lay again?\r\n").lower() == "p":
                     self.game_state = State.game_restart
                 else:
-                    playing = False
+                    self.game_state = State.gg
             elif self.game_state == State.gg:
-                print ("""
-   |\      _,,,---,,_
-   /,`.-'`'    -.  ;-;;,_
-  |,4-  ) )-,_..;\ (  `'-'
- '---''(_/--'  `-'\_)
-\t You died.
-""")
                 playing = False
 
 game = PerpendicularPaths()

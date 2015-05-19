@@ -7,9 +7,6 @@ from primative import *
 
 class BoardGenerator(object):
     #board
-    board_width = 16
-    section_width = 8
-
     board_sections = []
 
     def __init__ (self):
@@ -68,17 +65,27 @@ class BoardGenerator(object):
 
         assert len(self.board_sections) >= 4
 
+    def random_section (self):
+        random.shuffle (self.board_sections)
+        return copy.deepcopy (self.board_sections[0])
+
     def generate (self, key=None):
         board_top = []
         board_bot = []
         sections = []
-        if key is None:
-            sections = copy.deepcopy (self.board_sections)
-            random.shuffle (sections)
-            sections = sections[:4]
-        else:
-            for k in key.split("_"):
-                sections.append (copy.deepcopy (next(s for s in self.board_sections if s.key == k)))
+        keys = []
+        if key is not None:
+            keys = key.split("_")[:4]
+        
+        for i in range (len(keys), 4):
+            keys.append("")
+
+        for k in keys:
+            match = [s for s in self.board_sections if s.key == k]
+            if len(match) > 0:
+                sections.append (copy.deepcopy (match[0]))
+            else:
+                sections.append (self.random_section())
 
         assert len(sections) == 4
         for i, s in enumerate (sections):
