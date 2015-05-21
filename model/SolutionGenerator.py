@@ -1,4 +1,4 @@
-from primative import *
+from .primative import *
 import time
 import copy
 import itertools

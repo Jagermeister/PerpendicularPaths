@@ -3,7 +3,7 @@ import os
 import copy
 import json
 import random
-from primative import *
+from .primative import *
 
 class BoardGenerator(object):
     #board
@@ -24,7 +24,7 @@ class BoardGenerator(object):
             else:
                 empty[i] = [w, 0, 0, 0, 0, 0, 0, 0]
         
-        with open('board.json') as data_file:
+        with open('model/config/board.json') as data_file:
             data = json.load(data_file)
             for i, section in enumerate(data):
                 if section["type"] == "classic":

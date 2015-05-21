@@ -39,25 +39,10 @@ class Board (object):
     goals = property (_get_goals, _set_constant)
 
     def normalize (self):
+        #when possible, match every 1 sided wall with its pair
+        #example a W wall should have a matching E wall next door
         for y in range(0, self._width):
             for x in range(0, self._width):
-                # print ("(" + str(x) + "," + str(y) + ") -> " + str(self._board[y][x]) + ";\t", end="")
-                # if y != 0:
-                #     print ("N:" + str(self._board[y-1][x]) + ";", end="\t")
-                # else:
-                #     print ("", end="\t")
-                # if y != (self._width - 1):
-                #     print ("S:" + str(self._board[y+1][x]) + ";", end="\t")
-                # else:
-                #     print ("", end="\t")
-                # if x != (self._width - 1):
-                #     print ("E:" + str(self._board[y][x+1]) + ";", end="\t")
-                # else:
-                #     print ("", end="\t")
-                # if x != 0:
-                #     print ("W:" + str(self._board[y][x-1]) + ";", end="\t")
-                # else:
-                #     print ("", end="\t")
                 if x != 0 and self._board[y][x-1] & Shared.E.value == Shared.E.value:
                     self._board[y][x] |= Shared.W.value
                 if x != (self._width - 1) and self._board[y][x+1] & Shared.W.value == Shared.W.value:
@@ -66,8 +51,6 @@ class Board (object):
                     self._board[y][x] |= Shared.N.value
                 if y != (self._width - 1) and self._board[y+1][x] & Shared.N.value == Shared.N.value:
                     self._board[y][x] |= Shared.S.value
-                # print ("\t==> " + str(self._board[y][x]))
-        #input (self._key)
 
     def rotate (self, iterations=1):
         if iterations > 3:

@@ -1,5 +1,9 @@
 from .direction import Direction
 from .robot import Robot
+import configparser
+from os import path
+
+
 
 class Shared:
 	E = EAST = Direction ("East", 0b00000100, 1, 0)
@@ -16,3 +20,12 @@ class Shared:
 	G = GREEN = Robot ("Green", 0b10000000)
 
 	ROBOTS = [R, B, Y, G]
+
+	__config = None
+	def config():
+		if Shared.__config is None:
+			Shared.__config = configparser.ConfigParser()
+			file_path = path.relpath("model/config/config.ini")
+			with open(file_path) as f:
+				Shared.__config.read_file(f)
+		return Shared.__config

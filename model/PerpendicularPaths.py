@@ -2,8 +2,8 @@ from ctypes import *
 import os
 import time
 import random
-from BoardGenerator import *
-from SolutionGenerator import *
+from .BoardGenerator import *
+from .SolutionGenerator import *
 
 class State(object):
     play = 0b00000010
