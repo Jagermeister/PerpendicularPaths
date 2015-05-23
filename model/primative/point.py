@@ -1,9 +1,10 @@
 from .direction import Direction
-class Point (object):
+
+class Point(object):
     x = 0
     y = 0
 
-    def __init__ (self, x, y):
+    def __init__(self, x, y):
         assert isinstance(x, int)
         self.x = x
         assert isinstance(y, int)

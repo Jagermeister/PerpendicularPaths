@@ -2,10 +2,11 @@ from view import viewfactory as vf
 from model import core as pp
 
 def main():
-	model = pp.core()
+	model = pp.PerpendicularPaths()
 	view = vf.createFactory()
 	view.init(model)
-	while view.handle_events():
+	while 1:
+		view.handle_events()
 		view.update()
 		view.display()
 	view.quit()

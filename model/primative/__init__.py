@@ -1,7 +1,8 @@
-from .direction import *
-from .point import *
-from .goal import *
-from .board import *
-from .robot import *
-from .wall import *
-from .shared import *
+"""Collective includes for primative types"""
+from .direction import Direction
+from .point import Point
+from .goal import Goal
+from .board import Board
+from .robot import Robot
+from .wall import Wall
+from .shared import Shared
