@@ -6,6 +6,7 @@ class Robot(object):
 
     def __init__(self, name, value):
         assert isinstance(name, str)
+        assert len(name) > 0
         self.name = name
         assert isinstance(value, int)
         self.value = value

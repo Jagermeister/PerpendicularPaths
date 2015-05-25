@@ -27,3 +27,15 @@ class Shared:
             with open(file_path) as config_file:
                 Shared.__config.read_file(config_file)
         return Shared.__config
+
+    def robot_by_name(name):
+        name = name.upper()
+        for robot in Shared.ROBOTS:
+            if name == robot.name or name == robot.name[0]:
+                return robot
+
+    def direction_by_name(name):
+        name = name.upper()
+        for direction in Shared.DIRECTIONS:
+            if name == direction.name or name == direction.name[0]:
+                return direction

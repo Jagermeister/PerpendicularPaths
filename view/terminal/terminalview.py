@@ -1,229 +1,213 @@
+"""Terminal view for model display"""
 from view import viewinterface as v
 import os
-import time
-import sys
 from ctypes import c_ulong, windll
 from model.core import State
 from model.primative import Point, Shared
 
-class terminalview(v.viewinterface):
-	std_output_hdl = None
+class TerminalView(v.ViewInterface):
+    """Cross platform terminal output for model; basic input() events"""
+    std_output_hdl = None
+    model = None
+    is_new_game = None
 
-	def init(self, model):
-		self.model = model
+    def init(self, model):
+        """Keep model and start new game"""
+        self.model = model
+        self.is_new_game = True
 
-	def display_menu(self):
-		robot_direction = input("""\r\nMove with two characters:
-\tColor:\t\t [R]ed, [B]lue, [Y]ellow, [G]reen
-\tDirection:\t [N]orth, [S]outh, [E]ast, [W]est
-\t""" +("[U]ndo - [R]eset " if len(self.model.move_history) > 0 else "\t\t ") + 
-("[S]olve - " if len((self.model.board_section.goals[self.model.goal_index]).robots) == 1 else "") + "[N]ew Game - [Q]uit\r\n""")
-		os.system('cls' if os.name == 'nt' else 'clear')
-		robot_direction = robot_direction.lower()
-		robot = 0
-		direction = 0
-		if len(robot_direction) == 1:
-			if robot_direction == "q":
-				self.model.game_state = State.game_over
-				return
-			elif robot_direction == "r":
-				if len(self.model.move_history) > 0:
-					self.model.game_state = State.level_restart
-					return
-			elif robot_direction == "u":
-				if len(self.model.move_history) > 0:
-					last_move = self.model.move_history.pop(-1)
-					self.model.robot_location_update(last_move[0], last_move[2])
-					self.model.space_touched_remove_last()
-					print("\tReverted move of " + last_move[0].name + " to " + str(last_move[3]))
-					return
-			elif robot_direction == "s" and len(self.model.board_section.goals[self.model.goal_index].robots) == 1:
-				print("Solving...")
-				directions = []
-				for r in self.model.robots_location:
-					lastmove = self.model.move_history_by_robot(r)
-					if lastmove is not None:
-						directions.append(lastmove[1].value)
-					else:
-						directions.append(0)
+    def display_clear(self):
+        """Utility for cross platform terminal clear"""
+        os.system('cls' if os.name == 'nt' else 'clear')
 
-				answer = self.model.solver.generate(
-						self.model.robots_location,
-						self.model.board_section.goals[self.model.goal_index],
-						directions,
-						True
-					)
-				if answer is not None:
-					print("Move", end="\t")
-					for r in self.model.solver.robot_objects:
-						print(r.name, end="\t\t")
-					print("")
-					for i, move in enumerate(answer):
-						print("({0:02d}.".format(i), end=" ")
-						for m in move:
-							print("({0:02d},".format(m[0] % 16), end=" ")
-							print("{0:02d})".format(int(m[0] / 16)), end=" ")
-							if m[1] != 0:
-								print(next(d for d in Shared.DIRECTIONS if d.value == m[1]), end="\t")
-							else:
-								print("     ", end="\t")
-						print("")
-				return
-			elif robot_direction == "n":
-				self.model.game_state = State.game_restart
-				return
-		elif len(robot_direction) == 2:
-		    #TODO: Fix hardcode
-		    if robot_direction[0] == "r":
-		        robot = Shared.ROBOTS[0]
-		    elif robot_direction[0] == "b":
-		        robot = Shared.ROBOTS[1]
-		    elif robot_direction[0] == "y":
-		        robot = Shared.ROBOTS[2]
-		    elif robot_direction[0] == "g":
-		        robot = Shared.ROBOTS[3]
+    def new_game(self):
+        """ask for seed to create new game"""
+        self.display_clear()
+        print("SEED?")
+        print("\tLeave blank for random generation")
+        print("\t'L' for last seed")
+        seed = input("")
+        if seed.upper() == "L" and self.model.board_section is not None:
+            seed = self.model.board_section.key
+        self.display_clear()
+        self.is_new_game = False
+        self.model.new_game(seed if seed != "" else None)
 
-		    if robot_direction[1] == "n":
-		        direction = Shared.DIRECTIONS[0]
-		    elif robot_direction[1] == "s":
-		        direction = Shared.DIRECTIONS[1]
-		    elif robot_direction[1] == "e":
-		        direction = Shared.DIRECTIONS[2]
-		    elif robot_direction[1] == "w":
-		        direction = Shared.DIRECTIONS[3]
+    def display_menu(self):
+        """display commands and handle events for playing"""
+        options = []
+        if len(self.model.move_history) > 0:
+            options += ["Undo", "Reset"]
+        if len(self.model.goal().robots) == 1:
+            options.append("Solve")
+        options += ["New Game", "Quit"]
+        print("\r\n\tColor:\t\t{}\r\n\tDirection:\t{}\r\n\tOption:\t\t{}".format(
+            ", ".join(["[{}]{}".format(robot.name[0], robot.name[1:])
+                       for robot in Shared.ROBOTS]),
+            ", ".join(["[{}]{}".format(direction.name[0], direction.name[1:])
+                       for direction in Shared.DIRECTIONS]),
+            ", ".join(["[{}]{}".format(option[0], option[1:]) for option in options])))
+        robot_direction = input().lower()
+        self.display_clear()
+        robot = 0
+        direction = 0
+        if robot_direction == "q":
+            raise SystemExit
+        elif robot_direction == "r":
+            if len(self.model.move_history) > 0:
+                self.model.level_restart()
+                return
+        elif robot_direction == "u":
+            if len(self.model.move_history) > 0:
+                last_move = self.model.move_undo()
+                print("\tReverted move of {} to {}".format(
+                    last_move[0].name,
+                    last_move[3]))
+                return
+        elif robot_direction == "s" and len(self.model.goal().robots) == 1:
+            print("Solving...")
+            directions = []
+            for robot_location in self.model.robots_location:
+                lastmove = self.model.move_history_by_robot(robot_location)
+                directions.append(0 if lastmove is None else lastmove[1].value)
+            answer = self.model.solver.generate(
+                self.model.robots_location,
+                self.model.goal(),
+                directions,
+                True)
+            if answer is not None:
+                print("Move\t{}".format(
+                    "\t\t".join([robot.name
+                                 for robot
+                                 in self.model.solver.robot_objects])))
+                for i, move in enumerate(answer):
+                    print("{:02d}. {}".format(
+                        i,
+                        "\t".join(["({:02d}, {:02d}) {}".format(
+                            robot[0] % 16,
+                            int(robot[0] / 16),
+                            "     " if robot[1] == 0 else next(
+                                direction
+                                for direction
+                                in Shared.DIRECTIONS
+                                if direction.value == robot[1]))
+                                   for robot in move])))
+            return
+        elif robot_direction == "n":
+            self.is_new_game = True
+            return
+        elif len(robot_direction) == 2:
+            robot = Shared.robot_by_name(robot_direction[0])
+            direction = Shared.direction_by_name(robot_direction[1])
+        if robot and direction:
+            print("\tMoving {} in the direction {}".format(robot.name, direction.name))
+            self.model.robot_move(robot, direction)
+        else:
+            print("\t**Command '{}' not recognized!**\r\n".format(robot_direction))
 
-		if robot and direction:
-		    print("\tMoving " + robot.name + " in the direction " + direction.name)
-		    self.model.robot_move(robot, direction)
-		else:
-		    print("\t**Command '" + robot_direction + "' is not recognized!**\r\n")
+    def handle_events(self):
+        if self.is_new_game:
+            self.new_game()
+        elif self.model.game_state == State.play:
+            self.display_menu()
+        elif self.model.game_state == State.level_complete:
+            print("""\r\nCONGRATS!
+                !Level {} of {} completed in {} moves, {} seconds!
+                !You touched {} spaces!""".format(
+                    self.model.goal_index+1,
+                    len(self.model.board_section.goals),
+                    len(self.model.move_history),
+                    self.model.level_time,
+                    len(self.model.space_touched)))
+            input("Ready for next level ???")
+            self.display_clear()
+            self.model.new_level()
+        elif self.model.game_state == State.game_complete:
+            print("""Game completed - {} level(s) in {} moves, {} seconds!
+                You touched {} spaces!""".format(
+                    self.model.goal_index + 1,
+                    self.model.game_move_count,
+                    self.model.game_time_count,
+                    self.model.game_space_touched_count))
+            if input("\t[P]lay again?\r\n").lower() == "p":
+                self.display_clear()
+                self.model.new_game()
+            else:
+                raise SystemExit
 
-	def handle_events(self):
-		if self.model.game_state == State.game_restart:
-			os.system('cls' if os.name == 'nt' else 'clear')
-			print("SEED?")
-			print("\tLeave blank for random generation")
-			print("\t'L' for last seed")
-			seed = input("")
-			if seed.upper() == "L":
-			    if self.model.board_section is None:
-			        seed = None
-			    else:
-			        seed = self.model.board_section.key
-			self.model.new_game(seed if seed != "" else None)
-		elif self.model.game_state == State.level_restart:
-			self.model.new_level()
-			self.model.game_state = State.play
-		elif self.model.game_state == State.play:
-			# if level_starttime is None:
-			#     level_starttime = time.time()
-#			self.model.display_update()
-			goal = self.model.board_section.goals[self.model.goal_index]
-			for r in Shared.ROBOTS:
-			    if r in goal.robots:
-			        if goal.point == self.model.robots_location[r]:
-			            self.model.game_state = State.level_complete
-			if self.model.game_state == State.play:
-			    self.display_menu()
-		elif self.model.game_state == State.level_complete:
-			# self.model.game_time_count += time.time() - level_starttime
-			print("\r\nCONGRATS!")
-			# print("\t!Level " + str(self.model.goal_index+1) + " of " + str(len(self.model.board_section.goals)) + " completed in " + str(len(self.model.move_history)) + " moves, " + str(time.time() - level_starttime) + " seconds!")
-			print("\t!You touched " + str(len(self.model.space_touched)) + " spaces!")
-			input("Ready for next level ???")
-			os.system('cls' if os.name == 'nt' else 'clear')
-			# level_starttime = time.time()
-			self.model.game_move_count += len(self.model.move_history)
-			self.model.game_space_touched_count += len(self.model.space_touched)
-			self.model.robots_starting_location = {}
-			for r in self.model.robots_location:
-				self.model.robots_starting_location[r] = self.model.robots_location[r]
-			self.model.goal_index += 1
-			if self.model.goal_index == len(self.model.board_section.goals):
-				self.model.game_state = State.game_complete
-			else:
-				self.model.game_state = State.level_restart
-		elif self.model.game_state == State.game_complete:
-			print("Game completed - " + str(self.model.goal_index) + " level(s) in " + str(self.model.game_move_count) + " moves, " + str(self.model.game_time_count) + " seconds!")
-			print("You touched " + str(self.model.game_space_touched_count) + " spaces!")
-			if input("\t[P]lay again?\r\n").lower() == "p":
-				self.model.game_state = State.game_restart
-			else:
-				self.model.game_state = State.game_over
-		elif self.model.game_state == State.game_over:
-			raise SystemExit
+    def update(self):
+        """no internal state to update for terminal view"""
+        pass
 
-	def update(self):
-		pass
+    def space_touched_by_xy(self, cell):
+        """Color used to display most recent move history at 'cell'"""
+        color = 15 if os.name == 'nt' else ''
+        for space in self.model.space_touched:
+            if space[1] == cell:
+                color = space[2]
+        return color
 
-	def space_touched_by_xy(self, cell):
-		color = 15 if os.name == 'nt' else ''
-		for i, s in enumerate(self.model.space_touched):
-			if s[1] == cell:
-				color = s[2]
-		return color
+    def color_update(self, color, bgcolor=15 if os.name == 'nt' else 0):
+        """cross platform background and foreground color output"""
+        if os.name == 'nt':
+            print("", end="", flush=True)
+            if self.std_output_hdl is None:
+                standard_output_handle = c_ulong(0xfffffff5)
+                windll.Kernel32.GetStdHandle.restype = c_ulong
+                self.std_output_hdl = windll.Kernel32.GetStdHandle(standard_output_handle)
+            windll.Kernel32.SetConsoleTextAttribute(self.std_output_hdl, bgcolor | color)
+        else:
+            print("\033[" + str(bgcolor) + ";" + str(color) + "m", end="")
 
-	def color_update(self, color, bgcolor=15 if os.name == 'nt' else 0):
-		if os.name == 'nt':
-			print("", end="", flush=True)
-			if self.std_output_hdl is None:
-				STD_OUTPUT_HANDLE_ID = c_ulong(0xfffffff5)
-				windll.Kernel32.GetStdHandle.restype = c_ulong
-				self.std_output_hdl = windll.Kernel32.GetStdHandle(STD_OUTPUT_HANDLE_ID)
-			windll.Kernel32.SetConsoleTextAttribute(self.std_output_hdl, bgcolor | color)
-		else:
-			print("\033[" + str(bgcolor) + ";" + str(color) + "m", end="")
+    def display(self):
+        goal = self.model.board_section.goals[self.model.goal_index]
+        print("Goal {} of {}: move {} to cell ({}, {})".format(
+            self.model.goal_index+1,
+            len(self.model.board_section.goals),
+            " or ".join([robot.name for robot in goal.robots]),
+            goal.point.x,
+            goal.point.y))
+        print("\t" + " _"*self.model.board_section.width)
+        for j, row in enumerate(self.model.board_section.board):
+            print("\t", end="")
+            for k, cell in enumerate(row):
+                point = Point(k, j)
+                if cell & Shared.DIRECTIONS[3].value:
+                    print("|", end="")
+                elif k % 8 != 0:
+                    print(" ", end="")
 
-	def display(self):
-		goal = self.model.board_section.goals[self.model.goal_index]
-		print("Goal " + str(self.model.goal_index+1) + " of " + str(len(self.model.board_section.goals)) + ": move " + goal.robots[0].name + " to cell(" +(str(goal.point.x)) + ", " + str(goal.point.y) + ")", end="\r\n\t")
-		for r in range(0, self.model.board_section.width):
-			print(" _", end="")
-		print("")
-		for j, r in enumerate(self.model.board_section.board):
-			print("\t", end="")
-			for k, c in enumerate(r):
-				point = Point(k, j)
-				if c & Shared.DIRECTIONS[3].value == Shared.DIRECTIONS[3].value:
-					print("|", end="")
-				elif k % 8 != 0:
-					print(" ", end="")
+                robot = self.model.robot_by_cell(point)
+                back_color = 0
+                color = 15 if os.name == 'nt' else '30'
+                if robot is None:
+                    if goal.point == point:
+                        back_color = 0x0050 if os.name == 'nt' else 45
+                    else:
+                        color = self.space_touched_by_xy(point)
+                else:
+                    back_color = robot.bgcolor()
 
-				robot = self.model.robot_by_cell(point)
-				back_color = 0
-				color = 15 if os.name == 'nt' else '30'
-				if robot is None:
-					if goal.point == point:
-						back_color = 0x0050 if os.name == 'nt' else 45
-					else:
-						color = self.space_touched_by_xy(point) 
-				else:
-					back_color = robot.bgcolor()
+                self.color_update(color, back_color)
+                print("_" if cell & Shared.DIRECTIONS[1].value else ".", end="")
+                self.color_update(0)
+                if(k + 1) % 8 == 0 and not cell & Shared.DIRECTIONS[2].value:
+                    print(" ", end="") #end of board section and no east way
+                if(k + 1) % 16 == 0:
+                    print("|", end="")
+                    move_count = len(self.model.move_history)
+                    if move_count > 0:
+                        if j == 0:
+                            print("\tMove History({}):".format(move_count), end="")
+                        elif move_count >= j:
+                            last_move = self.model.move_history[-1*j]
+                            print("\t{}. {} {} from {}".format(
+                                move_count-j+1,
+                                last_move[0].name,
+                                last_move[1].name,
+                                last_move[2]), end="")
+            print("")
+        print("SEED: " + self.model.board_section.key)
 
-				self.color_update(color, back_color)
-				#RODO: South wall
-				if c & Shared.DIRECTIONS[1].value == Shared.DIRECTIONS[1].value:
-					print("_", end="")
-				else:
-					print(".", end="")
-				self.color_update(0)
-
-				if(k + 1) % 8 == 0 and c & Shared.DIRECTIONS[2].value != Shared.DIRECTIONS[2].value:
-					#end of board section and no an east way
-					print(" ", end="")
-				if(k + 1) % 16 == 0:
-					print("|", end="")
-					move_count = len(self.model.move_history)
-					if move_count > 0:
-						if j == 0:
-							print("\tPrevious Moves(" + str(move_count) + "):", end="")
-						elif move_count >= j:
-							last_move = self.model.move_history[-1*j]
-							print("\t" + str(move_count-j+1) + ". " + last_move[0].name + " " + last_move[1].name + " from ", end="")
-							print(last_move[2], end="")
-			print("")
-		print("SEED: " + self.model.board_section.key)
-
-
-	def quit(self):
-		pass
+    def quit(self):
+        pass
