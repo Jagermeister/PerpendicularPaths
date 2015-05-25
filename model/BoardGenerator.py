@@ -34,14 +34,7 @@ class BoardGenerator(object):
                     for goal in section["goals"]:
                         robots = []
                         for robot in goal[2]:
-                            if robot == "R":
-                                robots.append(Shared.R)
-                            if robot == "Y":
-                                robots.append(Shared.Y)
-                            if robot == "B":
-                                robots.append(Shared.B)
-                            if robot == "G":
-                                robots.append(Shared.G)
+                            robots.append(Shared.robot_by_name(robot))
                         goals.append(Goal(Point(goal[0], goal[1]), robots))
                     board = Board(
                         section["id"],
@@ -50,14 +43,7 @@ class BoardGenerator(object):
                     for wall in section["walls"]:
                         value = 0
                         for direction in wall[2]:
-                            if direction == "N":
-                                value |= Shared.N.value
-                            if direction == "S":
-                                value |= Shared.S.value
-                            if direction == "E":
-                                value |= Shared.E.value
-                            if direction == "W":
-                                value |= Shared.W.value
+                            value |= Shared.direction_by_name(direction).value
                         board._board[wall[1]][wall[0]] |= value
                     board.normalize()
                     #patch walls giving every N a neighbor S
@@ -69,19 +55,14 @@ class BoardGenerator(object):
         random.shuffle(self.board_sections)
         return copy.deepcopy(self.board_sections[0])
 
-    def generate(self, key=None):
+    def generate(self, boards=None):
+        assert boards is None or len(boards) == 4
         board_top = []
         board_bot = []
         sections = []
         keys = []
-        if key is not None:
-            keys = key.split("_")[:4]
-
-        for i in range(len(keys), 4):
-            keys.append("")
-
-        for k in keys:
-            match = [s for s in self.board_sections if s.key == k]
+        for board in boards:
+            match = [section for section in self.board_sections if section.key == board]
             if len(match) > 0:
                 sections.append(copy.deepcopy(match[0]))
             else:
@@ -98,11 +79,11 @@ class BoardGenerator(object):
         board_top.extend(board_bot)
         #goals have to have x,y updated based on region
         goals = sections[0].goals
-        goals += [Goal(Point(g.point.x + 8, g.point.y), g.robots) for g in sections[1].goals]
-        goals += [Goal(Point(g.point.x + 8, g.point.y + 8), g.robots) for g in sections[2].goals]
-        goals += [Goal(Point(g.point.x, g.point.y + 8), g.robots) for g in sections[3].goals]
+        goals += [Goal(Point(goal.point.x + 8, goal.point.y), goal.robots) for goal in sections[1].goals]
+        goals += [Goal(Point(goal.point.x + 8, goal.point.y + 8), goal.robots) for goal in sections[2].goals]
+        goals += [Goal(Point(goal.point.x, goal.point.y + 8), goal.robots) for goal in sections[3].goals]
         board = Board(
-            "_".join([str(s.key) for s in sections]),
+            "".join([str(section.key) for section in sections]),
             board_top,
             goals)
         board.normalize()

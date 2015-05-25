@@ -10,6 +10,7 @@ class TerminalView(v.ViewInterface):
     std_output_hdl = None
     model = None
     is_new_game = None
+    seed_last = None
 
     def init(self, model):
         """Keep model and start new game"""
@@ -20,18 +21,21 @@ class TerminalView(v.ViewInterface):
         """Utility for cross platform terminal clear"""
         os.system('cls' if os.name == 'nt' else 'clear')
 
-    def new_game(self):
+    def game_new(self):
         """ask for seed to create new game"""
         self.display_clear()
         print("SEED?")
         print("\tLeave blank for random generation")
         print("\t'L' for last seed")
         seed = input("")
-        if seed.upper() == "L" and self.model.board_section is not None:
-            seed = self.model.board_section.key
+        if seed.upper() == "L" and self.seed_last:
+            seed = self.seed_last
         self.display_clear()
         self.is_new_game = False
-        self.model.new_game(seed if seed != "" else None)
+        if seed:
+            self.seed_last = seed
+            print("SEED Requested: {}".format(seed))
+        self.model.game_new(seed if seed else None)
 
     def display_menu(self):
         """display commands and handle events for playing"""
@@ -41,7 +45,12 @@ class TerminalView(v.ViewInterface):
         if len(self.model.goal().robots) == 1:
             options.append("Solve")
         options += ["New Game", "Quit"]
-        print("\r\n\tColor:\t\t{}\r\n\tDirection:\t{}\r\n\tOption:\t\t{}".format(
+        if self.model.goal_index < len(self.model.board_section.goals) - 1:
+            options.append("Advance Level")
+        if self.model.goal_index > 0:
+            options.append("Previous Level")
+
+        print("\r\n\tColor:\t\t{}\r\n\tDirection:\t{}\r\n{}".format(
             ", ".join(["[{}]{}".format(robot.name[0], robot.name[1:])
                        for robot in Shared.ROBOTS]),
             ", ".join(["[{}]{}".format(direction.name[0], direction.name[1:])
@@ -96,6 +105,12 @@ class TerminalView(v.ViewInterface):
         elif robot_direction == "n":
             self.is_new_game = True
             return
+        elif robot_direction == "p" and self.model.goal_index > 0:
+            self.model.level_previous()
+            return
+        elif robot_direction == "a" and self.model.goal_index < len(self.model.board_section.goals) - 1:
+            self.model.level_next()
+            return
         elif len(robot_direction) == 2:
             robot = Shared.robot_by_name(robot_direction[0])
             direction = Shared.direction_by_name(robot_direction[1])
@@ -107,7 +122,7 @@ class TerminalView(v.ViewInterface):
 
     def handle_events(self):
         if self.is_new_game:
-            self.new_game()
+            self.game_new()
         elif self.model.game_state == State.play:
             self.display_menu()
         elif self.model.game_state == State.level_complete:
@@ -121,7 +136,7 @@ class TerminalView(v.ViewInterface):
                     len(self.model.space_touched)))
             input("Ready for next level ???")
             self.display_clear()
-            self.model.new_level()
+            self.model.level_new()
         elif self.model.game_state == State.game_complete:
             print("""Game completed - {} level(s) in {} moves, {} seconds!
                 You touched {} spaces!""".format(
@@ -131,7 +146,7 @@ class TerminalView(v.ViewInterface):
                     self.model.game_space_touched_count))
             if input("\t[P]lay again?\r\n").lower() == "p":
                 self.display_clear()
-                self.model.new_game()
+                self.model.game_new()
             else:
                 raise SystemExit
 
@@ -207,7 +222,22 @@ class TerminalView(v.ViewInterface):
                                 last_move[1].name,
                                 last_move[2]), end="")
             print("")
-        print("SEED: " + self.model.board_section.key)
+        robot_location_seed = "".join(["{}{:02d}{:02d}".format(
+            robot.name[0],
+            self.model.robots_location[robot].x,
+            self.model.robots_location[robot].y) for robot in self.model.robots_location])
+        goal_seed = "|".join(["{}{:02d}{:02d}".format(
+            "".join([robot.name[0] for robot in goal.robots]),
+            goal.point.x,
+            goal.point.y) for goal in self.model.board_section.goals])
+        print("SEED Level: {}!{}!{}".format(
+            self.model.board_section.key,
+            robot_location_seed,
+            goal_seed.split("|")[self.model.goal_index]))
+        print("SEED Game : {}!{}!{}".format(
+            self.model.board_section.key,
+            robot_location_seed,
+            goal_seed))
 
     def quit(self):
         pass

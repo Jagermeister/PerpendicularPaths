@@ -1,7 +1,7 @@
 import random
 import copy
 import time
-from .primative import Shared, Point, Board
+from .primative import Shared, Point, Board, Goal
 from .BoardGenerator import BoardGenerator
 from .SolutionGenerator import SolutionGenerator
 
@@ -29,46 +29,67 @@ class PerpendicularPaths:
     space_touched = []
         #id, cell, color
     goal_index = 0
+    config = None
+    #access to defaults
 
     def __init__(self):
+        self.config = Shared.config()
         self.game_state = State.game_restart
         self.__boardgenerator = BoardGenerator()
 
-    def __board_generate(self, seed=None):
-        self.board_section = self.__boardgenerator.generate(seed)
+    def __board_generate(self, boards=None, robots=None, goals=None, goal_count=None):
+        """
+        boards = list of 'board'.key values (string)
+        robots = list of tuple (Robot, Point)
+        goals = list of 'goal'
+        goal_count = number of goals for game up to len(boardgenerator.board_section.goals)
+        """
+        if goal_count is None:
+            goal_count = int(self.config['model']['robot_count_default'])
+        assert goal_count is not None
+        self.board_section = self.__boardgenerator.generate(boards)
         self.solver = SolutionGenerator(
             self.board_section,
             Shared.ROBOTS,
             Shared.DIRECTIONS)
-        self.__robots_generate()
+        self.__robots_generate(robots)
         random.shuffle(self.board_section.goals)
+        if goals is None:
+            goals = []
+        goal_count = min(goal_count, len(self.board_section.goals))
+        goals += self.board_section.goals[0:goal_count-len(goals)]
         self.board_section = Board(
             self.board_section.key,
             self.board_section.board,
-            self.board_section.goals[0:5])
+            goals)
 
-    def __robots_generate(self):
+    def __robots_generate(self, robots=None):
+        """robots = list of tuple (Robot, Point)"""
         self.__robots_starting_location = {}
+        if robots is not None:
+            for robot in robots:
+                self.__robots_starting_location[robot[0]] = robot[1]
         for robot in Shared.ROBOTS:
-            robot_placement_attempts = 0
-            try_again = True
-            while try_again:
-                new_point = Point(
-                    random.randint(0, self.board_section.width - 1),
-                    random.randint(0, self.board_section.height - 1))
-                if new_point.x not in(7, 8) and new_point.y not in(7, 8):
-                    try_again = False
-                    for goal in self.board_section.goals:
-                        if goal.point == new_point:
-                            try_again = True
-                            break
-                    for robot_placed in self.__robots_starting_location:
-                        if self.__robots_starting_location[robot_placed] == new_point:
-                            try_again = True
-                            break
-                assert robot_placement_attempts < 50
-                robot_placement_attempts += 1
-            self.__robots_starting_location[robot] = new_point
+            if self.__robots_starting_location.get(robot) is None:
+                robot_placement_attempts = 0
+                try_again = True
+                while try_again:
+                    new_point = Point(
+                        random.randint(0, self.board_section.width - 1),
+                        random.randint(0, self.board_section.height - 1))
+                    if new_point.x not in(7, 8) and new_point.y not in(7, 8):
+                        try_again = False
+                        for goal in self.board_section.goals:
+                            if goal.point == new_point:
+                                try_again = True
+                                break
+                        for robot_placed in self.__robots_starting_location:
+                            if self.__robots_starting_location[robot_placed] == new_point:
+                                try_again = True
+                                break
+                    assert robot_placement_attempts < 50
+                    robot_placement_attempts += 1
+                self.__robots_starting_location[robot] = new_point
 
     def __cell_move(self, point, direction, robot, space_touched_id):
         if self.board_section.board_value(point) & direction.value:
@@ -166,22 +187,64 @@ class PerpendicularPaths:
         for robot in self.__robots_starting_location:
             self.robots_location[robot] = self.__robots_starting_location[robot]
 
-    def new_level(self):
+    def level_next(self):
+        assert self.goal_index < len(self.board_section.goals) - 1
+        self.game_state = State.level_complete 
+        self.level_new()
+
+    def level_previous(self):
+        assert self.goal_index > 0
+        self.game_state = State.level_complete 
+        self.goal_index -= 2
+        self.level_new()
+
+    def level_new(self):
         """per level information: movehistory, spaces, robots"""
-        assert self.game_state in [State.play, State.level_complete]
+        assert self.game_state in [State.level_complete]
         self.goal_index += 1
         assert self.goal_index < len(self.board_section.goals)
         self.level_time = time.time()
         self.game_state = State.play
         self.level_restart()
 
-    def new_game(self, seed=None):
-        """generate board, setup goal, setup robots, start time"""
-        assert self.game_state in [State.game_complete, State.game_restart]
-        self.__board_generate(seed)
+    def game_new(self, seed=None, goal_count=None):
+        """generate board, setup goal, setup robots, start time
+        seed in the format of {BoardSectionKey}*4 + ! +
+        {ObjectName}[0]{Point}*4 + ! + {GoalObjectName}[0]{GoalPoint}
+        Example: A1A2A3A4!R0301B0415G0005Y1213!YBGR1203|B1515
+            BoardSection: A1A2A3A4
+            Object Point: R0301B0415G0005Y1213
+            Goal Objects: YBGR1203|B1515
+        """
+        boards = []
+        robots = None
+        goals = None
+        if isinstance(seed, str) and seed:
+            sections = seed.split("!")[:3]
+            boards = sections[0]
+            boards = [boards[i:i+2] for i in range(0, len(boards), 2)]
+            if len(sections) > 1 and len(sections) % 5 == 0:
+                robots = sections[1]
+                robots = [(
+                    Shared.robot_by_name(robots[i:i+1]), 
+                    Point(int(robots[i+1:i+3]), int(robots[i+3:i+5]))) 
+                          for i in range(0, len(robots), 5)]
+                for i in range(len(robots), 4):
+                    robots.append("")
+            if len(sections) > 2:
+                goals = sections[2].split("|")
+                goals = [Goal(
+                    Point(int(goalstring[-4:-2]), int(goalstring[-2:])),
+                    [Shared.robot_by_name(robot) for robot in goalstring[:-4]])
+                        for goalstring in goals]
+
+        for i in range(len(boards), 4):
+            boards.append("")
+
+        self.__board_generate(boards, robots, goals, goal_count)
         self.goal_index = -1
         self.game_move_count = 0
         self.game_time_count = 0
         self.game_space_touched_count = 0
-        self.game_state = State.play
-        self.new_level()
+        self.game_state = State.level_complete
+        self.level_new()
