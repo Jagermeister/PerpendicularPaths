@@ -6,11 +6,19 @@ from .BoardGenerator import BoardGenerator
 from .SolutionGenerator import SolutionGenerator
 
 class State(object):
+    """Current mode of 'PerpendicularPaths'"""
     play = 0b00000010
     game_over = 0b00010000
     level_complete = 0b10000000
     game_restart = 0b01000000
     game_complete = 0b00001000
+
+class PPMoveStatus(object):
+    """description of return state of us 'PerpendicularPaths'.robot_move"""
+    MOVE_SUCCESS = 0
+    PERPENDICULAR_MOVE_REQUIRED = 1
+    CANNOT_MOVE_DIRECTION = 2
+    PERPENDICULAR_BEFORE_GOAL = 3
 
 class PerpendicularPaths:
     board_section = None
@@ -25,9 +33,6 @@ class PerpendicularPaths:
     level_time = 0
     move_history = []
         #robot, direction, old cell, new cell
-    game_space_touched_count = 0
-    space_touched = []
-        #id, cell, color
     goal_index = 0
     config = None
     #access to defaults
@@ -91,7 +96,7 @@ class PerpendicularPaths:
                     robot_placement_attempts += 1
                 self.__robots_starting_location[robot] = new_point
 
-    def __cell_move(self, point, direction, robot, space_touched_id):
+    def __cell_move(self, point, direction, robot):
         if self.board_section.board_value(point) & direction.value:
             #Wall in point stopping us
             return point
@@ -101,19 +106,13 @@ class PerpendicularPaths:
             if advanced_cell == self.robots_location[_robot]:
                 #blocked by robot in next point
                 return point
-        self.space_touched.append((space_touched_id, point, robot.fgcolor()))
-        return self.__cell_move(advanced_cell, direction, robot, space_touched_id)
-
-    def __space_touched_remove_last(self):
-        if len(self.space_touched) > 0:
-            self.space_touched = [s for s in self.space_touched if not s[0] == self.space_touched[-1][0]]
+        return self.__cell_move(advanced_cell, direction, robot)
 
     def move_undo(self):
         """Remove the last move from history"""
         assert len(self.move_history) > 0
         last_move = self.move_history.pop(-1)
         self.robots_location[last_move[0]] = last_move[2]
-        self.__space_touched_remove_last()
         return last_move
 
     def move_history_by_robot(self, robot):
@@ -141,25 +140,18 @@ class PerpendicularPaths:
         last_move = self.move_history_by_robot(robot)
         if (last_move is not None and
                 (last_move[1] == direction or last_move[1] == direction.reverse())):
-            print("MUST MOVE PERPENDICULAR!")
-            return
+            return PPMoveStatus.PERPENDICULAR_MOVE_REQUIRED
         point = self.robots_location[robot]
         goal = self.board_section.goals[self.goal_index]
         new_cell = self.__cell_move(
             point,
             direction,
-            robot,
-            0 if len(self.space_touched) == 0 else self.space_touched[-1][0] + 1)
+            robot)
         if point == new_cell:
-            print("CAN NOT MOVE IN THAT DIRECTION")
+            return PPMoveStatus.CANNOT_MOVE_DIRECTION
         elif last_move is None and new_cell == goal.point and robot in goal.robots:
-            print("MUST MOVE PERPENDICULAR BEFORE GOAL")
-            self.__space_touched_remove_last()
+            return PPMoveStatus.PERPENDICULAR_BEFORE_GOAL
         else:
-            print("\t{} moved to {} from {}".format(
-                robot.name,
-                new_cell,
-                point))
             self.robots_location[robot] = new_cell
             self.move_history.append((robot, direction, point, new_cell))
         #check for win condition after move - adjust game state if needed
@@ -169,7 +161,6 @@ class PerpendicularPaths:
                 self.level_time = time.time() - self.level_time
                 self.game_time_count += self.level_time
                 self.game_move_count += len(self.move_history)
-                self.game_space_touched_count += len(self.space_touched)
                 self.__robots_starting_location = {}
                 for r in self.robots_location:
                     self.__robots_starting_location[r] = self.robots_location[r]
@@ -178,6 +169,7 @@ class PerpendicularPaths:
                 else:
                     self.game_state = State.level_complete
                 break
+        return PPMoveStatus.MOVE_SUCCESS
 
     def level_restart(self):
         assert self.game_state == State.play
