@@ -6,20 +6,34 @@ from ctypes import c_ulong, windll
 from model.core import State, PPMoveStatus
 from model.primative import Point, Shared
 
+class TerminalViewState(object):
+    """describe mode of terminal view from intial load, menu, and game"""
+    load = 0 #Initial load
+    menu = 1 #Menu Screen
+    game = 2 #Play Game
+
 class TerminalView(v.ViewInterface):
     """Cross platform terminal output for model; basic input() events"""
     std_output_hdl = None
     model = None
-    is_new_game = None
     seed_last = None
     game_space_touched_count = 0
     space_touched = []
         #id, cell, color
+    menu_key = None
+    menu_options = []
+    veiw_state = None   #TerminalViewState
 
     def init(self, model):
         """Keep model and start new game"""
         self.model = model
-        self.is_new_game = True
+        self.view_state = TerminalViewState.load
+        self.menu_key = 0 #Default key
+        self.menu_options = [
+                "New Game",
+                "Custom Game (SEED)",
+                "5x5 Puzzle"
+            ]
 
     def space_touched_add_move(self, move):
         """move = (robot, direction, old cell, new cell)"""
@@ -39,20 +53,17 @@ class TerminalView(v.ViewInterface):
         """Utility for cross platform terminal clear"""
         os.system('cls' if os.name == 'nt' else 'clear')
 
-    def game_new(self):
+    def game_new(self, seed=None, is_perpendicular_mode=True):
         """ask for seed to create new game"""
         self.display_clear()
-        seed = input("""SEED?
-            Leave blank for random generation
-            'L' for last seed""")
-        if seed.upper() == "L" and self.seed_last:
+        if seed == "L" and self.seed_last:
             seed = self.seed_last
         self.display_clear()
-        self.is_new_game = False
+        self.view_state = TerminalViewState.game
         if seed:
             self.seed_last = seed
             print("SEED Requested: {}".format(seed))
-        self.model.game_new(seed if seed else None)
+        self.model.game_new(seed if seed else None, None, is_perpendicular_mode)
 
     def display_menu(self):
         """display commands and handle events for playing"""
@@ -122,7 +133,7 @@ class TerminalView(v.ViewInterface):
                                    for robot in move])))
             return
         elif robot_direction == "n":
-            self.is_new_game = True
+            self.view_state = TerminalViewState.menu
             return
         elif robot_direction == "p" and self.model.goal_index > 0:
             self.model.level_previous()
@@ -155,37 +166,54 @@ class TerminalView(v.ViewInterface):
             print("MUST MOVE PERPENDICULAR BEFORE GOAL!")
 
     def handle_events(self):
-        if self.is_new_game:
-            self.game_new()
-        elif self.model.game_state == State.play:
-            self.display_menu()
-        elif self.model.game_state == State.level_complete:
-            print("""\r\nCONGRATS!
-                !Level {} of {} completed in {} moves, {} seconds!
-                !You touched {} spaces!""".format(
-                    self.model.goal_index+1,
-                    len(self.model.board_section.goals),
-                    len(self.model.move_history),
-                    self.model.level_time,
-                    len(self.space_touched)))
-            input("Ready for next level ???")
-            self.game_space_touched_count += len(self.space_touched)
-            self.space_touched = []
-            self.display_clear()
-            self.model.level_new()
-        elif self.model.game_state == State.game_complete:
-            print("""Game completed - {} level(s) in {} moves, {} seconds!
-                You touched {} spaces!""".format(
-                    self.model.goal_index + 1,
-                    self.model.game_move_count,
-                    self.model.game_time_count,
-                    self.game_space_touched_count))
-            if input("\t[P]lay again?\r\n").lower() == "p":
+        if self.view_state == TerminalViewState.menu:
+            answer = input("\n\r[U]p or [D]own to move menu\n\r").upper()
+            if answer == "U":
+                if self.menu_key > 0:
+                    self.menu_key -= 1
+            elif answer == "D":
+                if self.menu_key < len(self.menu_options) - 1:
+                    self.menu_key += 1
+            elif not answer:
+                if self.menu_key == 0:
+                    self.game_new()
+                elif self.menu_key == 1:
+                    seed = input("""SEED?
+                        Leave blank for random generation
+                        'L' for last seed\n\r>""").upper()
+                    self.game_new(seed)
+                elif self.menu_key == 2:
+                    self.game_new("E5", False)
+
+        elif self.view_state == TerminalViewState.game:
+            if self.model.game_state == State.play:
+                self.display_menu()
+            elif self.model.game_state == State.level_complete:
+                print("""\r\nCONGRATS!
+                    !Level {} of {} completed in {} moves, {} seconds!
+                    !You touched {} spaces!""".format(
+                        self.model.goal_index+1,
+                        len(self.model.board_section.goals),
+                        len(self.model.move_history),
+                        self.model.level_time,
+                        len(self.space_touched)))
+                input("Ready for next level ???")
+                self.game_space_touched_count += len(self.space_touched)
+                self.space_touched = []
+                self.display_clear()
+                self.model.level_new()
+            elif self.model.game_state == State.game_complete:
+                self.game_space_touched_count += len(self.space_touched)
+                print("""Game completed - {} level(s) in {} moves, {} seconds!
+                    You touched {} spaces!""".format(
+                        self.model.goal_index + 1,
+                        self.model.game_move_count,
+                        self.model.game_time_count,
+                        self.game_space_touched_count))
+                input("\tPress any key for main menu\r\n")
                 self.display_clear()
                 self.space_touched = []
-                self.model.game_new()
-            else:
-                raise SystemExit
+                self.view_state = TerminalViewState.menu
 
     def update(self):
         """no internal state to update for terminal view"""
@@ -211,7 +239,16 @@ class TerminalView(v.ViewInterface):
         else:
             print("\033[" + str(bgcolor) + ";" + str(color) + "m", end="")
 
-    def display(self):
+    def show_menu(self):
+        """basic menu"""
+        self.display_clear()
+        print("Main Menu\n\r")
+        for i, menu in enumerate(self.menu_options):
+            print("{} {}".format(
+                ">" if i == self.menu_key else " ",
+                menu))
+
+    def show_board(self):
         goal = self.model.board_section.goals[self.model.goal_index]
         print("Goal {} of {}: move {} to cell ({}, {})".format(
             self.model.goal_index+1,
@@ -224,9 +261,9 @@ class TerminalView(v.ViewInterface):
             print("\t", end="")
             for k, cell in enumerate(row):
                 point = Point(k, j)
-                if cell & Shared.DIRECTIONS[3].value:
+                if cell & Shared.W.value:
                     print("|", end="")
-                elif k % 8 != 0:
+                elif k % self.model.board_section.width:
                     print(" ", end="")
 
                 robot = self.model.robot_by_cell(point)
@@ -241,16 +278,16 @@ class TerminalView(v.ViewInterface):
                     back_color = robot.bgcolor()
 
                 self.color_update(color, back_color)
-                print("_" if cell & Shared.DIRECTIONS[1].value else ".", end="")
+                print("_" if cell & Shared.S.value else ".", end="")
                 self.color_update(0)
-                if(k + 1) % 8 == 0 and not cell & Shared.DIRECTIONS[2].value:
-                    print(" ", end="") #end of board section and no east way
-                if(k + 1) % 16 == 0:
+                if(k + 1) % self.model.board_section.width == 0:
                     print("|", end="")
                     move_count = len(self.model.move_history)
                     if move_count > 0:
                         if j == 0:
-                            print("\tMove History({}):".format(move_count), end="")
+                            print("\tMove History({})\t\tSpace Traveled ({})".format(
+                                move_count,
+                                len(self.space_touched)), end="")
                         elif move_count >= j:
                             last_move = self.model.move_history[-1*j]
                             print("\t{}. {} {} from {}".format(
@@ -275,6 +312,15 @@ class TerminalView(v.ViewInterface):
             self.model.board_section.key,
             robot_location_seed,
             goal_seed))
+
+    def display(self):
+        if self.view_state == TerminalViewState.load:
+            self.view_state = TerminalViewState.menu
+
+        if self.view_state == TerminalViewState.menu:
+            self.show_menu()
+        elif self.view_state == TerminalViewState.game:
+            self.show_board()
 
     def quit(self):
         pass

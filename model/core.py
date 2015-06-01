@@ -36,13 +36,18 @@ class PerpendicularPaths:
     goal_index = 0
     config = None
     #access to defaults
+    is_perpendicular_mode = True
+    #Controls enforement of move rules
 
     def __init__(self):
         self.config = Shared.config()
         self.game_state = State.game_restart
         self.__boardgenerator = BoardGenerator()
 
-    def __board_generate(self, boards=None, robots=None, goals=None, goal_count=None):
+    def __board_generate(
+            self, boards=None, robots=None,
+            goals=None, dimension=None, goal_count=None,
+            is_perpendicular_mode=True):
         """
         boards = list of 'board'.key values (string)
         robots = list of tuple (Robot, Point)
@@ -52,11 +57,12 @@ class PerpendicularPaths:
         if goal_count is None:
             goal_count = int(self.config['model']['robot_count_default'])
         assert goal_count is not None
-        self.board_section = self.__boardgenerator.generate(boards)
+        self.board_section = self.__boardgenerator.generate(boards, dimension)
         self.solver = SolutionGenerator(
             self.board_section,
             Shared.ROBOTS,
             Shared.DIRECTIONS)
+        self.solver.is_perpendicular_mode = is_perpendicular_mode
         self.__robots_generate(robots)
         random.shuffle(self.board_section.goals)
         if goals is None:
@@ -110,6 +116,7 @@ class PerpendicularPaths:
 
     def move_undo(self):
         """Remove the last move from history"""
+        assert isinstance(self.move_history, list)
         assert len(self.move_history) > 0
         last_move = self.move_history.pop(-1)
         self.robots_location[last_move[0]] = last_move[2]
@@ -117,6 +124,7 @@ class PerpendicularPaths:
 
     def move_history_by_robot(self, robot):
         """Utility for returning a robots most recent move"""
+        assert isinstance(self.move_history, list)
         last_move = None
         for move in self.move_history:
             if move[0] == robot:
@@ -125,6 +133,7 @@ class PerpendicularPaths:
 
     def robot_by_cell(self, cell):
         """Utility for finding robot by value instead of key"""
+        assert isinstance(self.robots_location, dict)
         for robot in self.robots_location:
             if self.robots_location[robot] == cell:
                 return robot
@@ -138,9 +147,9 @@ class PerpendicularPaths:
         """request to move 'robot' in 'direction'"""
         assert self.game_state == State.play
         last_move = self.move_history_by_robot(robot)
-        if (last_move is not None and
-                (last_move[1] == direction or last_move[1] == direction.reverse())):
-            return PPMoveStatus.PERPENDICULAR_MOVE_REQUIRED
+        if self.is_perpendicular_mode:
+            if last_move is not None and last_move[1] in (direction, direction.reverse()):
+                return PPMoveStatus.PERPENDICULAR_MOVE_REQUIRED
         point = self.robots_location[robot]
         goal = self.board_section.goals[self.goal_index]
         new_cell = self.__cell_move(
@@ -149,7 +158,7 @@ class PerpendicularPaths:
             robot)
         if point == new_cell:
             return PPMoveStatus.CANNOT_MOVE_DIRECTION
-        elif last_move is None and new_cell == goal.point and robot in goal.robots:
+        elif self.is_perpendicular_mode and last_move is None and new_cell == goal.point and robot in goal.robots:
             return PPMoveStatus.PERPENDICULAR_BEFORE_GOAL
         else:
             self.robots_location[robot] = new_cell
@@ -174,24 +183,23 @@ class PerpendicularPaths:
     def level_restart(self):
         assert self.game_state == State.play
         self.move_history = []
-        self.space_touched = []
         self.robots_location = {}
         for robot in self.__robots_starting_location:
             self.robots_location[robot] = self.__robots_starting_location[robot]
 
     def level_next(self):
         assert self.goal_index < len(self.board_section.goals) - 1
-        self.game_state = State.level_complete 
+        self.game_state = State.level_complete
         self.level_new()
 
     def level_previous(self):
         assert self.goal_index > 0
-        self.game_state = State.level_complete 
+        self.game_state = State.level_complete
         self.goal_index -= 2
         self.level_new()
 
     def level_new(self):
-        """per level information: movehistory, spaces, robots"""
+        """per level information: movehistory, robots"""
         assert self.game_state in [State.level_complete]
         self.goal_index += 1
         assert self.goal_index < len(self.board_section.goals)
@@ -199,7 +207,7 @@ class PerpendicularPaths:
         self.game_state = State.play
         self.level_restart()
 
-    def game_new(self, seed=None, goal_count=None):
+    def game_new(self, seed=None, goal_count=None, is_perpendicular_mode=True):
         """generate board, setup goal, setup robots, start time
         seed in the format of {BoardSectionKey}*4 + ! +
         {ObjectName}[0]{Point}*4 + ! + {GoalObjectName}[0]{GoalPoint}
@@ -208,18 +216,24 @@ class PerpendicularPaths:
             Object Point: R0301B0415G0005Y1213
             Goal Objects: YBGR1203|B1515
         """
+        self.is_perpendicular_mode = is_perpendicular_mode
         boards = []
+        dimension = None
         robots = None
         goals = None
         if isinstance(seed, str) and seed:
             sections = seed.split("!")[:3]
-            boards = sections[0]
-            boards = [boards[i:i+2] for i in range(0, len(boards), 2)]
+            if sections[0][0] == "E":
+                dimension = int(sections[0][1:])
+            else:
+                boards = sections[0]
+                boards = [boards[i:i+2] for i in range(0, len(boards), 2)]
+
             if len(sections) > 1 and len(sections) % 5 == 0:
                 robots = sections[1]
                 robots = [(
-                    Shared.robot_by_name(robots[i:i+1]), 
-                    Point(int(robots[i+1:i+3]), int(robots[i+3:i+5]))) 
+                    Shared.robot_by_name(robots[i:i+1]),
+                    Point(int(robots[i+1:i+3]), int(robots[i+3:i+5])))
                           for i in range(0, len(robots), 5)]
                 for i in range(len(robots), 4):
                     robots.append("")
@@ -228,15 +242,15 @@ class PerpendicularPaths:
                 goals = [Goal(
                     Point(int(goalstring[-4:-2]), int(goalstring[-2:])),
                     [Shared.robot_by_name(robot) for robot in goalstring[:-4]])
-                        for goalstring in goals]
+                         for goalstring in goals]
 
-        for i in range(len(boards), 4):
-            boards.append("")
+        if not dimension:
+            for i in range(len(boards), 4):
+                boards.append("")
 
-        self.__board_generate(boards, robots, goals, goal_count)
+        self.__board_generate(boards, robots, goals, dimension, goal_count, is_perpendicular_mode)
         self.goal_index = -1
         self.game_move_count = 0
         self.game_time_count = 0
-        self.game_space_touched_count = 0
         self.game_state = State.level_complete
         self.level_new()

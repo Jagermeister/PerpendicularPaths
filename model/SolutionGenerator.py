@@ -2,25 +2,28 @@ import time
 import copy
 import itertools
 from collections import deque
+from .primative import Shared
 
 class SolutionGenerator(object):
     direction_reverse = {}
     direction_delta = {}
+    is_perpendicular_mode = True
 
     def __init__(self, boardsection, robots, directions):
+        self.board_width = boardsection.width
         self.board = list(itertools.chain.from_iterable(boardsection._board))
         self.robot_objects = copy.deepcopy(robots)
         self.directions = directions
         self.direction_reverse = {
-            0b00000001: 0b00000010,
-            0b00000010: 0b00000001,
-            0b00000100: 0b00001000,
-            0b00001000: 0b00000100}
+            Shared.N.value: Shared.S.value,
+            Shared.S.value: Shared.N.value,
+            Shared.E.value: Shared.W.value,
+            Shared.W.value: Shared.E.value}
         self.direction_delta = {
-            0b00000001: -16,
-            0b00000010: +16,
-            0b00000100: +1,
-            0b00001000: -1}
+            Shared.N.value: -self.board_width,
+            Shared.S.value: +self.board_width,
+            Shared.E.value: +1,
+            Shared.W.value: -1}
 
     def cell_move(self, index, direction, node):
         while True:
@@ -40,7 +43,7 @@ class SolutionGenerator(object):
         moves = deque()
         for index in range(0, len(self.robot_objects)):
             for direction in self.directions:
-                if node[index][1] not in(direction.value, self.direction_reverse[direction.value]):
+                if not self.is_perpendicular_mode or node[index][1] not in(direction.value, self.direction_reverse[direction.value]):
                     #ricochet rule
                     new_cell = node[index][0]
                     advanced_index = 0
@@ -55,10 +58,10 @@ class SolutionGenerator(object):
                             new_cell = advanced_index
                             continue
                         break
-                    if(node[index][0] != new_cell and not(
+                    if(node[index][0] != new_cell and (not self.is_perpendicular_mode or not(
                             index == 3 and
                             node[index][1] == 0 and
-                            new_cell == goal_index)):
+                            new_cell == goal_index))):
                         updated_robots = copy.copy(node)
                         updated_robots[index] = (new_cell, direction.value)
                         moves.append(updated_robots)
@@ -81,7 +84,7 @@ class SolutionGenerator(object):
                 self.robot_objects.append(self.robot_objects.pop(i))
                 break
         start_position = list(
-            [(robots[robot].y * 16 + robots[robot].x, directions[ii])
+            [(robots[robot].y * self.board_width + robots[robot].x, directions[ii])
              for i, robot_template
              in enumerate(self.robot_objects)
              for ii, robot
@@ -89,17 +92,20 @@ class SolutionGenerator(object):
              if robot_template.value == robot.value
             ])
         #reorder our robots - put the goal robot last @ [3]
-        goal_index = goal.point.y * 16 + goal.point.x
+        goal_index = goal.point.y * self.board_width + goal.point.x
+        minx = maxx = miny = maxy = None
         for direction in self.directions:
-            new_cell = self.cell_move(goal_index, direction.value, [])
-            if new_cell != goal_index:
-                if direction.value in (4, 8):#EorW
-                    minx = new_cell if new_cell < goal_index else goal_index
-                    maxx = new_cell if new_cell > goal_index else goal_index
-                elif direction.value in (1, 2):#NorS
-                    miny = new_cell if new_cell < goal_index else goal_index
-                    maxy = new_cell if new_cell > goal_index else goal_index
-        minymod = miny % 16
+            if self.board[goal_index] & self.direction_reverse[direction.value]:
+                new_cell = self.cell_move(goal_index, direction.value, [])
+                if new_cell != goal_index:
+                    if direction.value in (Shared.E.value, Shared.W.value):
+                        minx = new_cell if new_cell < goal_index else goal_index
+                        maxx = new_cell if new_cell > goal_index else goal_index
+                    elif direction.value in (Shared.N.value, Shared.S.value):#NorS
+                        miny = new_cell if new_cell < goal_index else goal_index
+                        maxy = new_cell if new_cell > goal_index else goal_index
+        if miny is not None:
+            minymod = miny % self.board_width
         positions_seen = {}
         #directary of seen positions
         path_length = 1
@@ -122,11 +128,17 @@ class SolutionGenerator(object):
                 total_seen_count += seen_count
                 seen_count = 0
             seen_count += 1
-            if goal_index == node[3][0] or (
-                    (node[3][1] in (1, 2) and maxx >= node[3][0] >= minx) or (
-                        node[3][1] in (3, 4) and 
+            if (goal_index == node[3][0]
+                or (
+                    minx is not None and
+                    maxx is not None and
+                    miny is not None and
+                    maxy is not None and
+                    ((node[3][1] in (Shared.N.value, Shared.S.value) and maxx >= node[3][0] >= minx) or (
+                        node[3][1] in (Shared.E.value, Shared.W.value) and 
                         maxy >= node[3][0] >= miny and 
-                        node[3][0] % 16 == minymod)):
+                        node[3][0] % self.board_width == minymod)))):
+# EEK This only works when we know our goal will have the backstops
                 total_seen_count += seen_count
                 if verbose:
                     print("\tanswer found in " + str(time.clock() - time_start) + "s")

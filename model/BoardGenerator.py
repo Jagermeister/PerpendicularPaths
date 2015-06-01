@@ -5,25 +5,25 @@ from .primative import Shared, Point, Goal, Board
 
 class BoardGenerator(object):
     #board
-    board_sections = []
+    __board_sections = []
+    
+    generated = False
+    """"""
 
     def __init__(self):
-        empty = [0]*8
+        board_width = 8
+        empty = [0]*board_width
         for i in range(len(empty)):
-            if i == 0:
-                empty[i] = [
-                    Shared.N.value|Shared.W.value,
-                    Shared.N.value,
-                    Shared.N.value,
-                    Shared.N.value,
-                    Shared.N.value,
-                    Shared.N.value,
-                    Shared.N.value,
-                    Shared.N.value]
-            elif i == 7:
-                empty[i] = [Shared.W.value, 0, 0, 0, 0, 0, 0, Shared.W.value|Shared.N.value]
-            else:
-                empty[i] = [Shared.W.value, 0, 0, 0, 0, 0, 0, 0]
+            if i == 0: #First
+                empty[i] = [Shared.N.value|Shared.W.value]
+                empty[i] += [Shared.N.value]*(board_width-1)
+            elif i == board_width-1: #Last
+                empty[i] = [Shared.W.value]
+                empty[i] += [0]*(board_width-2)
+                empty[i] += [Shared.W.value|Shared.N.value]
+            else: #Middle
+                empty[i] = [Shared.W.value]
+                empty[i] += [0]*(board_width-1)
 
         with open('model/config/board.json') as data_file:
             data = json.load(data_file)
@@ -47,22 +47,22 @@ class BoardGenerator(object):
                         board._board[wall[1]][wall[0]] |= value
                     board.normalize()
                     #patch walls giving every N a neighbor S
-                    self.board_sections.append(board)
+                    self.__board_sections.append(board)
 
-        assert len(self.board_sections) >= 4
+        assert len(self.__board_sections) >= 4
 
     def random_section(self):
-        random.shuffle(self.board_sections)
-        return copy.deepcopy(self.board_sections[0])
+        random.shuffle(self.__board_sections)
+        return copy.deepcopy(self.__board_sections[0])
 
-    def generate(self, boards=None):
-        assert boards is None or len(boards) == 4
+    def __generate_by_board_section_keys(self, board_section_keys):
+        assert board_section_keys is None or len(board_section_keys) == 4
         board_top = []
         board_bot = []
         sections = []
         keys = []
-        for board in boards:
-            match = [section for section in self.board_sections if section.key == board]
+        for board_key in board_section_keys:
+            match = [section for section in self.__board_sections if section.key == board_key]
             if len(match) > 0:
                 sections.append(copy.deepcopy(match[0]))
             else:
@@ -88,3 +88,38 @@ class BoardGenerator(object):
             goals)
         board.normalize()
         return board
+
+    def __generate_by_dimension(self, dimension):
+        assert isinstance(dimension, int) and dimension > 0
+        empty = [0]*dimension
+        for i in range(dimension):
+            empty[i] = []
+            if i == 0:
+                empty[i].append(Shared.N.value|Shared.W.value)
+                empty[i] += [Shared.N.value]*(dimension-2)
+                empty[i].append(Shared.N.value|Shared.E.value)
+            elif i == dimension-1:
+                empty[i].append(Shared.W.value|Shared.S.value)
+                empty[i] += [Shared.S.value]*(dimension-2)
+                empty[i].append(Shared.E.value|Shared.S.value)
+            else:
+                empty[i].append(Shared.W.value)
+                empty[i] += [0]*(dimension-2)
+                empty[i].append(Shared.E.value)
+        return Board(
+            "E{}".format(dimension),
+            empty,
+            [Goal(Point(2, 2), [Shared.R])])
+
+    def generate(self, board_section_keys=None, dimension=None):
+        """
+        board_section_keys = cooresponds to list of keys set in /config/board.json
+        dimension = matrix width 
+        """
+        if board_section_keys is not None and len(board_section_keys) == 4:
+            return self.__generate_by_board_section_keys(board_section_keys)
+        elif isinstance(dimension, int) and dimension > 0:
+            return self.__generate_by_dimension(dimension)
+        else:
+            return None
+

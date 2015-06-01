@@ -4,23 +4,27 @@ import configparser
 from os import path
 
 class Shared:
-    E = EAST = Direction("East", 0b00000100, 1, 0)
-    N = NORTH = Direction("North", 0b00000001, 0, -1, EAST)
-    W = WEST = Direction("West", 0b00001000, -1, 0, NORTH)
-    S = SOUTH = Direction("South", 0b00000010, 0, 1, WEST)
+    E = EAST = Direction("East", 4, 1, 0)
+    N = NORTH = Direction("North", 1, 0, -1, EAST)
+    W = WEST = Direction("West", 8, -1, 0, NORTH)
+    S = SOUTH = Direction("South", 2, 0, 1, WEST)
     EAST.rotate = SOUTH
-
     DIRECTIONS = [N, S, E, W]
 
-    R = RED = Robot("Red", 0b00010000)
-    B = BLUE = Robot("Blue", 0b00100000)
-    Y = YELLOW = Robot("Yellow", 0b01000000)
-    G = GREEN = Robot("Green", 0b10000000)
-
+    R = RED = Robot("Red", 16)
+    B = BLUE = Robot("Blue", 32)
+    Y = YELLOW = Robot("Yellow", 64)
+    G = GREEN = Robot("Green", 128)
+    O = ORANGE = Robot("Orange", 256)
+    P = PURPLE = Robot("Purple", 512)
+    V = SILVER = Robot("Silver", 1024)
     ROBOTS = [R, B, Y, G]
+    EXPAND = [V]
+    LUNARL = [O, P]
 
     __config = None
     def config():
+        """Load our config.ini file which has our settings as key=value"""
         if Shared.__config is None:
             Shared.__config = configparser.ConfigParser()
             file_path = path.relpath("model/config/config.ini")
@@ -29,6 +33,7 @@ class Shared:
         return Shared.__config
 
     def robot_by_name(name):
+        #TODO pass in which robots to use
         name = name.upper()
         for robot in Shared.ROBOTS:
             if name == robot.name or name == robot.name[0]:
