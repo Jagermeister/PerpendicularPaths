@@ -3,27 +3,40 @@ from view import viewinterface as v
 import pygame
 from pygame.locals import *
 
+class Robot(pygame.sprite.Sprite):
+    def __init__(self, color, position):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface([10,10])
+        self.image.fill(NativeView.WHITE)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        pygame.draw.circle(self.image, color, (5, 5), 5, 0)
+
 class NativeView(v.ViewInterface):
     """Leverage pygame framework for drawing of primative objects"""
     screen = None
     background = None
     model = None
     board = None
-    
-    # Colors
+    robots = None
+    robot_group = pygame.sprite.Group()
+
+    # RGB Colors
     BLACK = (  0,   0,   0)
     WHITE = (255, 255, 255)
     BLUE =  (  0,   0, 255)
     GREEN = (  0, 255,   0)
     RED =   (255,   0,   0)
     YELLOW =(255, 255,   0)
+    TRANS  =(  1,   1,   1)
 
-    SIZE = (600, 600)
+    SIZE = width, height = 600, 600
+    SPEED = [2, 2]
 
     # Robot locations (this is just for initial layout design!!)
-    red_bot = (0,0)
-    blue_bot = (3,14)
-    green_bot = (9, 4)
+    red_bot    = (0,0)
+    blue_bot   = (3,14)
+    green_bot  = (9, 4)
     yellow_bot = (15,12)
 
     def init(self, model):
@@ -46,11 +59,17 @@ class NativeView(v.ViewInterface):
         for i in range (1,16):
             pygame.draw.line(self.board, self.BLACK, [i*20, 0], [i*20, 320], 1)
             pygame.draw.line(self.board, self.BLACK, [0, i*20], [320, i*20], 1)
-        pygame.draw.circle(self.board, self.RED, (self.red_bot[0]*20+10, self.red_bot[1]*20+10), 5, 0)
-        pygame.draw.circle(self.board, self.BLUE, (self.blue_bot[0]*20+10, self.blue_bot[1]*20+10), 5, 0)
-        pygame.draw.circle(self.board, self.GREEN, (self.green_bot[0]*20+10, self.green_bot[1]*20+10), 5, 0)
-        pygame.draw.circle(self.board, self.YELLOW, (self.yellow_bot[0]*20+10, self.yellow_bot[1]*20+10), 5, 0)
 
+        # Draw the Robots
+        self.robots = pygame.Surface((320,320))
+        self.robots = self.robots.convert()
+        self.robots.set_colorkey(self.TRANS)
+        self.robots.fill(self.TRANS)
+        self.robot_group.add(Robot(self.RED, (self.red_bot[0]*20+10, self.red_bot[1]*20+10)))
+        self.robot_group.add(Robot(self.BLUE, (self.blue_bot[0]*20+10, self.blue_bot[1]*20+10)))
+        self.robot_group.add(Robot(self.GREEN, (self.green_bot[0]*20+10, self.green_bot[1]*20+10)))
+        self.robot_group.add(Robot(self.YELLOW, (self.yellow_bot[0]*20+10, self.yellow_bot[1]*20+10)))
+        self.robot_group.draw(self.robots)
 
     def handle_events(self):
         """Translate user input to model actions"""
@@ -62,6 +81,7 @@ class NativeView(v.ViewInterface):
         """Blit everything to the screen"""
         self.screen.blit(self.background, (0,0))
         self.screen.blit(self.board, (50,50))
+        self.screen.blit(self.robots, (50,50))
         pygame.display.flip()
 
     def quit(self):
