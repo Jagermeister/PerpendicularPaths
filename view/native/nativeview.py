@@ -7,7 +7,8 @@ class Robot(pygame.sprite.Sprite):
     def __init__(self, color, position):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.Surface([10,10])
-        self.image.fill(NativeView.WHITE)
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
         pygame.draw.circle(self.image, color, (5, 5), 5, 0)
@@ -28,6 +29,7 @@ class NativeView(v.ViewInterface):
     GREEN = (  0, 255,   0)
     RED =   (255,   0,   0)
     YELLOW =(255, 255,   0)
+    PURPLE =(255,   0, 255)
     TRANS  =(  1,   1,   1)
 
     SIZE = width, height = 600, 600
@@ -36,11 +38,12 @@ class NativeView(v.ViewInterface):
     # Robot locations (this is just for initial layout design!!)
     red_bot    = (0,0)
     blue_bot   = (3,14)
-    green_bot  = (9, 4)
+    green_bot  = (9,4)
     yellow_bot = (15,12)
+    goal       = (14,3)
 
     def init(self, model):
-        """Initialise screen"""
+        """Initialize screen"""
         self.model = model
         pygame.init()
         self.screen = pygame.display.set_mode(self.SIZE)
@@ -59,6 +62,7 @@ class NativeView(v.ViewInterface):
         for i in range (1,16):
             pygame.draw.line(self.board, self.BLACK, [i*20, 0], [i*20, 320], 1)
             pygame.draw.line(self.board, self.BLACK, [0, i*20], [320, i*20], 1)
+        pygame.draw.rect(self.board, self.PURPLE, (self.goal[0]*20+3,self.goal[1]*20+3,15,15), 0)
 
         # Draw the Robots
         self.robots = pygame.Surface((320,320))
