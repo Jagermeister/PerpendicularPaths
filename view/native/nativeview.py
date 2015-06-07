@@ -2,6 +2,8 @@
 from view import viewinterface as v
 import pygame
 from pygame.locals import *
+import os
+from model.primative import Point, Shared
 
 class Robot(pygame.sprite.Sprite):
     def __init__(self, color, position):
@@ -33,18 +35,11 @@ class NativeView(v.ViewInterface):
     TRANS  =(  1,   1,   1)
 
     SIZE = width, height = 600, 600
-    SPEED = [2, 2]
-
-    # Robot locations (this is just for initial layout design!!)
-    red_bot    = (0,0)
-    blue_bot   = (3,14)
-    green_bot  = (9,4)
-    yellow_bot = (15,12)
-    goal       = (14,3)
 
     def init(self, model):
         """Initialize screen"""
         self.model = model
+        model.game_new()        
         pygame.init()
         self.screen = pygame.display.set_mode(self.SIZE)
         pygame.display.set_caption('Perpendicular Paths')
@@ -54,26 +49,33 @@ class NativeView(v.ViewInterface):
         self.background = self.background.convert()
         self.background.fill(self.WHITE)
 
-        # Draw the board
+        # Draw the board, robots, and goal
         self.board = pygame.Surface((320,320))
         self.board = self.board.convert()
         self.board.fill(self.WHITE)
-        pygame.draw.rect(self.board, self.BLACK, [0,0,320,320], 4)
-        for i in range (1,16):
-            pygame.draw.line(self.board, self.BLACK, [i*20, 0], [i*20, 320], 1)
-            pygame.draw.line(self.board, self.BLACK, [0, i*20], [320, i*20], 1)
-        pygame.draw.rect(self.board, self.PURPLE, (self.goal[0]*20+3,self.goal[1]*20+3,15,15), 0)
-
-        # Draw the Robots
         self.robots = pygame.Surface((320,320))
         self.robots = self.robots.convert()
         self.robots.set_colorkey(self.TRANS)
         self.robots.fill(self.TRANS)
-        self.robot_group.add(Robot(self.RED, (self.red_bot[0]*20+10, self.red_bot[1]*20+10)))
-        self.robot_group.add(Robot(self.BLUE, (self.blue_bot[0]*20+10, self.blue_bot[1]*20+10)))
-        self.robot_group.add(Robot(self.GREEN, (self.green_bot[0]*20+10, self.green_bot[1]*20+10)))
-        self.robot_group.add(Robot(self.YELLOW, (self.yellow_bot[0]*20+10, self.yellow_bot[1]*20+10)))
+        pygame.draw.rect(self.board, self.BLACK, [0,0,320,320], 4)
+        for i in range (1,16):
+            pygame.draw.line(self.board, self.BLACK, [i*20, 0], [i*20, 320], 1)
+            pygame.draw.line(self.board, self.BLACK, [0, i*20], [320, i*20], 1)
+        for j, row in enumerate(self.model.board_section.board):
+            for k, cell in enumerate(row):
+                point = Point(k, j)
+                if cell & Shared.W.value:
+                    pygame.draw.line(self.board, self.BLACK, [point.x*20,point.y*20], [point.x*20,point.y*20+20], 4)
+                if cell & Shared.S.value:
+                    pygame.draw.line(self.board, self.BLACK, [point.x*20,point.y*20+20], [point.x*20+20,point.y*20+20], 4)
+                robot = self.model.robot_by_cell(point)
+                if robot is not None:
+                    color = robot.nativecolor()
+                    self.robot_group.add(Robot(color, (point.x*20+10, point.y*20+10)))
         self.robot_group.draw(self.robots)
+        goal = self.model.board_section.goals[self.model.goal_index]
+        pygame.draw.rect(self.board, self.PURPLE, (goal.point.x*20+5,goal.point.y*20+5,12,12), 0)
+        
 
     def handle_events(self):
         """Translate user input to model actions"""

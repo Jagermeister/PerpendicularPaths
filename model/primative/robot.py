@@ -37,3 +37,13 @@ class Robot(object):
             return 14 if os.name == 'nt' else 33
         elif self.value == 0b10000000:
             return 10 if os.name == 'nt' else 32
+
+    def nativecolor(self):
+        if self.value == 0b00010000:
+            return (255,0,0)
+        elif self.value == 0b00100000:
+            return (0,0,255)
+        elif self.value == 0b01000000:
+            return (255,255,0)
+        elif self.value == 0b10000000:
+            return (0,255,0)
