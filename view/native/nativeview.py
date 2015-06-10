@@ -15,6 +15,19 @@ class Robot(pygame.sprite.Sprite):
         self.rect.center = position
         pygame.draw.circle(self.image, color, (5, 5), 5, 0)
 
+class Wall(pygame.sprite.Sprite):
+    def __init__(self, direction, position):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface([25,25])
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.TRANS)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        if direction == Shared.W.value:
+            pygame.draw.line(self.image, NativeView.BLACK, [0,0], [0,20], 4)
+        elif direction == Shared.S.value:
+            pygame.draw.line(self.image, NativeView.BLACK, [0,20], [20,20], 4)
+
 class NativeView(v.ViewInterface):
     """Leverage pygame framework for drawing of primative objects"""
     screen = None
@@ -22,6 +35,7 @@ class NativeView(v.ViewInterface):
     model = None
     board = None
     robots = None
+    wall_group = pygame.sprite.Group()
     robot_group = pygame.sprite.Group()
 
     # RGB Colors
@@ -33,6 +47,7 @@ class NativeView(v.ViewInterface):
     YELLOW =(255, 255,   0)
     PURPLE =(255,   0, 255)
     TRANS  =(  1,   1,   1)
+    GRAY   =(211, 211, 211)
 
     SIZE = width, height = 600, 600
 
@@ -50,9 +65,9 @@ class NativeView(v.ViewInterface):
         self.background.fill(self.WHITE)
 
         # Draw the board, robots, and goal
-        self.board = pygame.Surface((320,320))
+        self.board = pygame.Surface((321,321))
         self.board = self.board.convert()
-        self.board.fill(self.WHITE)
+        self.board.fill(self.GRAY)
         self.robots = pygame.Surface((320,320))
         self.robots = self.robots.convert()
         self.robots.set_colorkey(self.TRANS)
@@ -65,18 +80,19 @@ class NativeView(v.ViewInterface):
             for k, cell in enumerate(row):
                 point = Point(k, j)
                 if cell & Shared.W.value:
-                    pygame.draw.line(self.board, self.BLACK, [point.x*20,point.y*20], [point.x*20,point.y*20+20], 4)
+                    self.wall_group.add(Wall(Shared.W.value, (point.x*20+10, point.y*20+10)))
                 if cell & Shared.S.value:
-                    pygame.draw.line(self.board, self.BLACK, [point.x*20,point.y*20+20], [point.x*20+20,point.y*20+20], 4)
-                robot = self.model.robot_by_cell(point)
-                if robot is not None:
-                    color = robot.nativecolor()
-                    self.robot_group.add(Robot(color, (point.x*20+10, point.y*20+10)))
+                    self.wall_group.add(Wall(Shared.S.value, (point.x*20+10, point.y*20+10)))
+        for r in self.model.robots_location:
+            color = r.nativecolor()
+            point = self.model.robots_location[r]
+            self.robot_group.add(Robot(color, (point.x*20+10, point.y*20+10)))
         self.robot_group.draw(self.robots)
+        self.wall_group.draw(self.board)
         goal = self.model.board_section.goals[self.model.goal_index]
         pygame.draw.rect(self.board, self.PURPLE, (goal.point.x*20+5,goal.point.y*20+5,12,12), 0)
-        
 
+        
     def handle_events(self):
         """Translate user input to model actions"""
         for event in pygame.event.get():
@@ -93,4 +109,3 @@ class NativeView(v.ViewInterface):
     def quit(self):
         """Clean up assets and unload graphic objects"""
         pygame.quit()
-        pass
