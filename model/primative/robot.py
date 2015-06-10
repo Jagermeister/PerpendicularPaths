@@ -38,7 +38,7 @@ class Robot(object):
         elif self.value == 0b10000000:
             return 10 if os.name == 'nt' else 32
 
-    def nativecolor(self):
+    def rgbcolor(self):
         if self.value == 0b00010000:
             return (255,0,0)
         elif self.value == 0b00100000:
