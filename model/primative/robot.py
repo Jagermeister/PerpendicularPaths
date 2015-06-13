@@ -10,9 +10,10 @@ class Robot(object):
         self.name = name
         assert isinstance(value, int)
         self.value = value
-
-    def __str__(self):
-        return self.name
+        
+    def __str__(self): 
+        """debug output of name"""
+        return self.name.rjust(6)
 
     def __deepcopy__(self, memo):
         return self

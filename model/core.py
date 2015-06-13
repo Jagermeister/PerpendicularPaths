@@ -143,9 +143,8 @@ class PerpendicularPaths:
         assert self.game_state == State.play
         return self.board_section.goals[self.goal_index]
 
-    def robot_move(self, robot, direction):
+    def __move(self, robot, direction):
         """request to move 'robot' in 'direction'"""
-        assert self.game_state == State.play
         last_move = self.move_history_by_robot(robot)
         if self.is_perpendicular_mode:
             if last_move is not None and last_move[1] in (direction, direction.reverse()):
@@ -161,8 +160,34 @@ class PerpendicularPaths:
         elif self.is_perpendicular_mode and last_move is None and new_cell == goal.point and robot in goal.robots:
             return PPMoveStatus.PERPENDICULAR_BEFORE_GOAL
         else:
+            return new_cell
+
+    def robot_moves(self, robot=None):
+        """Return list of possible moves filtered by 'robot'"""
+        assert robot is None or robot in Shared.ROBOTS
+        if robot:
+            robots = [robot]
+        else:
+            robots = Shared.ROBOTS
+        moves = []
+        for bot in robots:
+            point = self.robots_location[bot]
+            for direction in Shared.DIRECTIONS:
+                new_cell = self.__move(bot, direction)
+                if isinstance(new_cell, Point):
+                    moves.append((bot, direction, point, new_cell))
+        return moves
+
+    def robot_move(self, robot, direction):
+        """request to move 'robot' in 'direction'"""
+        assert self.game_state == State.play
+        new_cell = self.__move(robot, direction)
+        if isinstance(new_cell, int):
+            return new_cell
+        else:
+            self.move_history.append((robot, direction, self.robots_location[robot], new_cell))
             self.robots_location[robot] = new_cell
-            self.move_history.append((robot, direction, point, new_cell))
+            
         #check for win condition after move - adjust game state if needed
         goal = self.goal()
         for robot in Shared.ROBOTS:
