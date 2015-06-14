@@ -4,6 +4,7 @@ import pygame
 from pygame.locals import *
 import os
 from model.primative import Point, Shared
+import math
 
 class Robot(pygame.sprite.Sprite):
     color = None
@@ -52,6 +53,16 @@ class MovesBorder(pygame.sprite.Sprite):
         self.rect.center = position
         pygame.draw.rect(self.image, color, (0,0,20,20), 2)
 
+class DirectionIndicator(pygame.sprite.Sprite):
+    def __init__(self, position, start, end):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface ([320,320])
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.TRANS)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        pygame.draw.line(self.image, NativeView.PURPLE, start, end, 3)
+
 class NativeView(v.ViewInterface):
     """Leverage pygame framework for drawing of primative objects"""
     screen = None
@@ -60,12 +71,18 @@ class NativeView(v.ViewInterface):
     board = None
     robots = None
     goal = None
+    direction_indicator = None
+    move_robot = None
+    click_pos = None
     moves_border = None
     robot_clicked = False
+    is_dragging = False
+    move_direction = None
     wall_group = pygame.sprite.Group()
     robot_group = pygame.sprite.Group()
     goal_group = pygame.sprite.Group()
     moves_border_group = pygame.sprite.Group()
+    direction_indicator_group = pygame.sprite.Group()
 
     # RGB Colors
     BLACK = (  0,   0,   0)
@@ -100,12 +117,30 @@ class NativeView(v.ViewInterface):
                 self.quit()
 
             elif event.type == MOUSEBUTTONDOWN and event.button == 1:
-                click_pos = (event.pos[0]-50, event.pos[1]-50)
-                self.show_possible_moves(click_pos)
+                self.click_pos = event.pos
+                self.show_possible_moves(event.pos)
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
+                self.move_robot = None
+                self.is_dragging = False
                 self.moves_border_group.empty()
                 self.moves_border.fill(self.TRANS)
+                self.direction_indicator_group.empty()
+                self.direction_indicator_group.fill(self.TRANS)
+
+            elif event.type == MOUSEMOTION and event.buttons[0] == 1 and self.move_robot is not None:
+                self.show_direction_indicator()
+
+    def degrees_to_direction(self, degrees):
+        """Utility to convert degrees from an angle to a direction"""
+        if 125 >= degrees > 55:
+            return 'East'
+        elif 215>= degrees > 145:
+            return 'North'
+        elif 305 >= degrees > 235:
+            return 'West'
+        elif 35 >= degrees or degrees >= 325:
+            return 'South'
 
     def show_board(self):
         """Displays the board, robots, and goal"""
@@ -150,17 +185,45 @@ class NativeView(v.ViewInterface):
         self.moves_border = self.goal.convert()
         self.moves_border.set_colorkey(self.TRANS)
         self.moves_border.fill(self.TRANS)
-        robot = [robot for robot in self.robot_group if robot.rect.collidepoint(position)]
+        move_robot_click_pos = (position[0]-50, position[1]-50)
+        robot = [robot for robot in self.robot_group if robot.rect.collidepoint(move_robot_click_pos)]
         if len(robot) == 1:
             self.robot_clicked = True
-            move_robot = robot[0]
-            move_robot_click_pos = position
-            possible_moves = self.model.robot_moves(move_robot.robot_object)
-            color = move_robot.color
+            self.move_robot = robot[0]
+            possible_moves = self.model.robot_moves(self.move_robot.robot_object)
+            color = self.move_robot.color
             for m in possible_moves:
                 move_to = (m[3].x*20+10, m[3].y*20+10)
                 self.moves_border_group.add(MovesBorder(color, move_to))
         self.moves_border_group.draw(self.moves_border)
+
+    def show_direction_indicator(self):
+        """Displays the direction intended to move in"""
+        self.direction_indicator_group.empty()
+        self.is_dragging = True
+        self.direction_indicator = pygame.Surface((320,320))
+        self.direction_indicator = self.direction_indicator.convert()
+        self.direction_indicator.set_colorkey(self.TRANS)
+        self.direction_indicator.fill(self.TRANS)
+        move_robot_rel_pos = pygame.mouse.get_pos()
+        dy = float(move_robot_rel_pos[1] - self.click_pos[1])
+        dx = float(move_robot_rel_pos[0] - self.click_pos[0])
+        m = 0.0 if dx == 0 else dy/dx
+        rad = math.atan2(dy,dx)
+        degrees = (90 - ((rad*180) / math.pi)) % 360
+        self.move_direction = self.degrees_to_direction(degrees)
+        move_direction_end = self.move_robot.rect.center
+        if self.move_direction == 'North':
+            move_direction_end = (move_direction_end[0],move_direction_end[1] - 40)
+        elif self.move_direction == 'South':
+            move_direction_end = (move_direction_end[0],move_direction_end[1] + 40)
+        elif self.move_direction == 'East':
+            move_direction_end = (move_direction_end[0] + 40,move_direction_end[1])
+        elif self.move_direction == 'West':
+            move_direction_end = (move_direction_end[0] - 40,move_direction_end[1])
+        self.direction_indicator_group.add(DirectionIndicator((160,160), self.move_robot.rect.center, move_direction_end))
+        self.direction_indicator_group.draw(self.direction_indicator)
+
 
     def display(self):
         """Blit everything to the screen"""
@@ -170,6 +233,8 @@ class NativeView(v.ViewInterface):
         self.screen.blit(self.goal, (50,50))
         if self.robot_clicked:
             self.screen.blit(self.moves_border, (50,50))
+            if self.move_direction:
+                self.screen.blit(self.direction_indicator, (50,50))
         pygame.display.update()
 
     def quit(self):
