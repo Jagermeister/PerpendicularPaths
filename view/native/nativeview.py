@@ -76,8 +76,10 @@ class NativeView(v.ViewInterface):
     click_pos = None
     moves_border = None
     robot_clicked = False
+    possible_moves = None
     is_dragging = False
     move_direction = None
+    desired_move = None
     wall_group = pygame.sprite.Group()
     robot_group = pygame.sprite.Group()
     goal_group = pygame.sprite.Group()
@@ -108,6 +110,8 @@ class NativeView(v.ViewInterface):
         self.background = self.background.convert()
         self.background.fill(self.WHITE)
         self.show_board()
+        self.show_robots()
+        self.show_goal()
         
     def handle_events(self):
         """Translate user input to model actions"""
@@ -121,12 +125,19 @@ class NativeView(v.ViewInterface):
                 self.show_possible_moves(event.pos)
 
             elif event.type == MOUSEBUTTONUP and event.button == 1:
+                if self.desired_move is not None:
+                    self.model.robot_move(self.move_robot.robot_object, self.desired_move)
+                    self.robot_group.empty()
+                    self.show_robots()
+                    self.desired_move = None
                 self.move_robot = None
                 self.is_dragging = False
                 self.moves_border_group.empty()
                 self.moves_border.fill(self.TRANS)
                 self.direction_indicator_group.empty()
-                self.direction_indicator_group.fill(self.TRANS)
+                if self.direction_indicator is not None:
+                    self.direction_indicator.fill(self.TRANS)
+                self.move_direction = None
 
             elif event.type == MOUSEMOTION and event.buttons[0] == 1 and self.move_robot is not None:
                 self.show_direction_indicator()
@@ -134,16 +145,16 @@ class NativeView(v.ViewInterface):
     def degrees_to_direction(self, degrees):
         """Utility to convert degrees from an angle to a direction"""
         if 125 >= degrees > 55:
-            return 'East'
+            return Shared.E
         elif 215>= degrees > 145:
-            return 'North'
+            return Shared.N
         elif 305 >= degrees > 235:
-            return 'West'
+            return Shared.W
         elif 35 >= degrees or degrees >= 325:
-            return 'South'
+            return Shared.S
 
     def show_board(self):
-        """Displays the board, robots, and goal"""
+        """Displays the board"""
         self.board = pygame.Surface((321,321))
         self.board = self.board.convert()
         self.board.fill(self.GRAY)                
@@ -160,6 +171,8 @@ class NativeView(v.ViewInterface):
                     self.wall_group.add(Wall(Shared.S.value, (point.x*20+10, point.y*20+10)))
         self.wall_group.draw(self.board)
         
+    def show_robots(self):
+        """Displays the robots"""    
         self.robots = pygame.Surface((320,320))
         self.robots = self.robots.convert()
         self.robots.set_colorkey(self.TRANS)
@@ -170,6 +183,8 @@ class NativeView(v.ViewInterface):
             self.robot_group.add(Robot(color, (point.x*20+10, point.y*20+10), r))
         self.robot_group.draw(self.robots)
 
+    def show_goal(self):
+        """Displays the goal"""
         self.goal = pygame.Surface((320,320))
         self.goal = self.goal.convert()
         self.goal.set_colorkey(self.TRANS)
@@ -181,6 +196,7 @@ class NativeView(v.ViewInterface):
 
     def show_possible_moves(self, position):
         """Displays possible moves for selected robot"""
+        self.possible_moves = None
         self.moves_border = pygame.Surface((320,320))
         self.moves_border = self.goal.convert()
         self.moves_border.set_colorkey(self.TRANS)
@@ -190,9 +206,9 @@ class NativeView(v.ViewInterface):
         if len(robot) == 1:
             self.robot_clicked = True
             self.move_robot = robot[0]
-            possible_moves = self.model.robot_moves(self.move_robot.robot_object)
+            self.possible_moves = self.model.robot_moves(self.move_robot.robot_object)
             color = self.move_robot.color
-            for m in possible_moves:
+            for m in self.possible_moves:
                 move_to = (m[3].x*20+10, m[3].y*20+10)
                 self.moves_border_group.add(MovesBorder(color, move_to))
         self.moves_border_group.draw(self.moves_border)
@@ -201,6 +217,7 @@ class NativeView(v.ViewInterface):
         """Displays the direction intended to move in"""
         self.direction_indicator_group.empty()
         self.is_dragging = True
+        self.desired_move = None
         self.direction_indicator = pygame.Surface((320,320))
         self.direction_indicator = self.direction_indicator.convert()
         self.direction_indicator.set_colorkey(self.TRANS)
@@ -213,16 +230,20 @@ class NativeView(v.ViewInterface):
         degrees = (90 - ((rad*180) / math.pi)) % 360
         self.move_direction = self.degrees_to_direction(degrees)
         move_direction_end = self.move_robot.rect.center
-        if self.move_direction == 'North':
-            move_direction_end = (move_direction_end[0],move_direction_end[1] - 40)
-        elif self.move_direction == 'South':
-            move_direction_end = (move_direction_end[0],move_direction_end[1] + 40)
-        elif self.move_direction == 'East':
-            move_direction_end = (move_direction_end[0] + 40,move_direction_end[1])
-        elif self.move_direction == 'West':
-            move_direction_end = (move_direction_end[0] - 40,move_direction_end[1])
-        self.direction_indicator_group.add(DirectionIndicator((160,160), self.move_robot.rect.center, move_direction_end))
-        self.direction_indicator_group.draw(self.direction_indicator)
+        legal_moves = [direction[1].name for direction in self.possible_moves]
+        if self.move_direction:
+            if self.move_direction.name == 'North' and 'North' in legal_moves:
+                move_direction_end = (move_direction_end[0],move_direction_end[1] - 40)
+            elif self.move_direction.name == 'South' and 'South' in legal_moves:
+                move_direction_end = (move_direction_end[0],move_direction_end[1] + 40)
+            elif self.move_direction.name == 'East' and 'East' in legal_moves:
+                move_direction_end = (move_direction_end[0] + 40,move_direction_end[1])
+            elif self.move_direction.name == 'West' and 'West' in legal_moves:
+                move_direction_end = (move_direction_end[0] - 40,move_direction_end[1])
+            if move_direction_end != self.move_robot.rect.center:
+                self.desired_move = self.move_direction
+                self.direction_indicator_group.add(DirectionIndicator((160,160), self.move_robot.rect.center, move_direction_end))
+                self.direction_indicator_group.draw(self.direction_indicator)
 
 
     def display(self):
