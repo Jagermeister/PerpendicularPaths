@@ -7,19 +7,18 @@ from model.primative import Point, Shared
 import math
 
 class Robot(pygame.sprite.Sprite):
-    color = None
     robot_object = None
 
-    def __init__(self, color, position, robot_object):
+    def __init__(self, position, robot_object):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.Surface([10,10])
         self.image.set_colorkey(NativeView.TRANS)
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
-        pygame.draw.circle(self.image, color, (5, 5), 5, 0)
-        self.color = color
         self.robot_object = robot_object
+        pygame.draw.circle(self.image, self.robot_object.rgbcolor(), (5, 5), 5, 0)
+        
 
 class Wall(pygame.sprite.Sprite):
     def __init__(self, direction, position):
@@ -56,35 +55,54 @@ class MovesBorder(pygame.sprite.Sprite):
 class DirectionIndicator(pygame.sprite.Sprite):
     def __init__(self, position, start, end):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.Surface ([320,320])
+        self.image = pygame.Surface([320,320])
         self.image.set_colorkey(NativeView.TRANS)
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
         pygame.draw.line(self.image, NativeView.PURPLE, start, end, 3)
 
+class MoveHistoryText(pygame.sprite.Sprite):
+    def __init__(self, position, display_text):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface([160, 20]).convert()
+        #self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.BLACK)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        font = pygame.font.Font(None, 16)
+        text = font.render(display_text, 1, NativeView.WHITE)
+        textpos = text.get_rect()
+        textpos.centerx = 80
+        self.image.blit(text, textpos)
+
 class NativeView(v.ViewInterface):
     """Leverage pygame framework for drawing of primative objects"""
-    screen = None
-    background = None
     model = None
+    #Core
+    screen = None
+    background = None  
     board = None
     robots = None
     goal = None
+    move_history = None
     direction_indicator = None
-    move_robot = None
-    click_pos = None
     moves_border = None
+    #Surfaces
+    move_robot = None
+    move_direction = None
+    click_pos = None
     robot_clicked = False
     possible_moves = None
     is_dragging = False
-    move_direction = None
     desired_move = None
+    all_sprites = pygame.sprite.Group()
     wall_group = pygame.sprite.Group()
     robot_group = pygame.sprite.Group()
     goal_group = pygame.sprite.Group()
     moves_border_group = pygame.sprite.Group()
     direction_indicator_group = pygame.sprite.Group()
+    move_history_group = pygame.sprite.Group()
 
     # RGB Colors
     BLACK = (  0,   0,   0)
@@ -112,6 +130,7 @@ class NativeView(v.ViewInterface):
         self.show_board()
         self.show_robots()
         self.show_goal()
+        self.show_move_history()
         
     def handle_events(self):
         """Translate user input to model actions"""
@@ -178,9 +197,8 @@ class NativeView(v.ViewInterface):
         self.robots.set_colorkey(self.TRANS)
         self.robots.fill(self.TRANS)
         for r in self.model.robots_location:
-            color = r.rgbcolor()
             point = self.model.robots_location[r]
-            self.robot_group.add(Robot(color, (point.x*20+10, point.y*20+10), r))
+            self.robot_group.add(Robot((point.x*20+10, point.y*20+10), r))
         self.robot_group.draw(self.robots)
 
     def show_goal(self):
@@ -207,11 +225,26 @@ class NativeView(v.ViewInterface):
             self.robot_clicked = True
             self.move_robot = robot[0]
             self.possible_moves = self.model.robot_moves(self.move_robot.robot_object)
-            color = self.move_robot.color
+            color = self.move_robot.robot_object.rgbcolor()
             for m in self.possible_moves:
                 move_to = (m[3].x*20+10, m[3].y*20+10)
                 self.moves_border_group.add(MovesBorder(color, move_to))
         self.moves_border_group.draw(self.moves_border)
+
+    def show_move_history(self):
+        """Displays the move history list"""
+        self.move_history_group.empty()
+        self.move_history = pygame.Surface((160,320))
+        self.move_history = self.move_history.convert()
+        self.move_history.set_colorkey(self.TRANS)
+        self.move_history.fill(self.TRANS)
+        for j, move in enumerate(self.model.move_history):
+            self.move_history_group.add(MoveHistoryText((0+80,j*20+10), "{}. {} {} from {}".format(
+                j+1,
+                move[0].name,
+                move[1].name,
+                move[2])))
+        self.move_history_group.draw(self.move_history)
 
     def show_direction_indicator(self):
         """Displays the direction intended to move in"""
@@ -229,22 +262,14 @@ class NativeView(v.ViewInterface):
         rad = math.atan2(dy,dx)
         degrees = (90 - ((rad*180) / math.pi)) % 360
         self.move_direction = self.degrees_to_direction(degrees)
-        move_direction_end = self.move_robot.rect.center
-        legal_moves = [direction[1].name for direction in self.possible_moves]
-        if self.move_direction:
-            if self.move_direction.name == 'North' and 'North' in legal_moves:
-                move_direction_end = (move_direction_end[0],move_direction_end[1] - 40)
-            elif self.move_direction.name == 'South' and 'South' in legal_moves:
-                move_direction_end = (move_direction_end[0],move_direction_end[1] + 40)
-            elif self.move_direction.name == 'East' and 'East' in legal_moves:
-                move_direction_end = (move_direction_end[0] + 40,move_direction_end[1])
-            elif self.move_direction.name == 'West' and 'West' in legal_moves:
-                move_direction_end = (move_direction_end[0] - 40,move_direction_end[1])
-            if move_direction_end != self.move_robot.rect.center:
-                self.desired_move = self.move_direction
-                self.direction_indicator_group.add(DirectionIndicator((160,160), self.move_robot.rect.center, move_direction_end))
-                self.direction_indicator_group.draw(self.direction_indicator)
-
+        legal_moves = [move for move in self.possible_moves if move[1] == self.move_direction]
+        if legal_moves:
+            legal_move = legal_moves[0]
+            #robot, direction, old cell, new cell
+            move_direction_end = (legal_move[3].x*20+10, legal_move[3].y*20+10)
+            self.desired_move = self.move_direction
+            self.direction_indicator_group.add(DirectionIndicator((160,160), self.move_robot.rect.center, move_direction_end))
+            self.direction_indicator_group.draw(self.direction_indicator)
 
     def display(self):
         """Blit everything to the screen"""
@@ -256,6 +281,8 @@ class NativeView(v.ViewInterface):
             self.screen.blit(self.moves_border, (50,50))
             if self.move_direction:
                 self.screen.blit(self.direction_indicator, (50,50))
+        self.show_move_history()
+        self.screen.blit(self.move_history, (400,50))
         pygame.display.update()
 
     def quit(self):
