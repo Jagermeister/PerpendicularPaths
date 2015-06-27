@@ -104,11 +104,12 @@ class MoveHistoryText(pygame.sprite.Sprite):
     def __init__(self, position, display_text):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.Surface([160, 20]).convert()
-        self.image.fill(NativeView.BLACK)
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
         font = pygame.font.Font(None, 16)
-        text = font.render(display_text, 1, NativeView.WHITE)
+        text = font.render(display_text, 1, NativeView.BLACK, NativeView.WHITE)
         textpos = text.get_rect()
         textpos.centerx = 80
         self.image.blit(text, textpos)
@@ -167,7 +168,6 @@ class NativeView(v.ViewInterface):
         self.gameplay = pygame.Surface(self.SIZE).convert()
         self.gameplay.set_colorkey(self.TRANS)
         self.gameplay.fill(self.TRANS)
-        self.show_move_history()
         self.screen.blit(self.background, (0,0))
 
         #Create the grid
@@ -235,6 +235,12 @@ class NativeView(v.ViewInterface):
             self.board_cell_to_pixel(goal.point),
             self.space_size))
 
+        #Move history heading
+        text = MoveHistoryText(
+            ((self.spaces*self.space_size)+(self.board_x_offset*2)+80, 30),
+            "Move History")
+        text.add(self.all_sprites_group)
+
     def board_cell_to_pixel(self, point):
         """Given point for board, return the center point pixels in an x,y tuple"""
         return(point.x * self.space_size + (self.space_size / 2) + self.board_x_offset,
@@ -270,20 +276,18 @@ class NativeView(v.ViewInterface):
         for border_sprite in self.possible_moves_group:
             border_sprite.kill()
 
-    def show_move_history(self):
-        """Displays the move history list"""
-        self.move_history_group.empty()
-        self.move_history = pygame.Surface((160,320))
-        self.move_history = self.move_history.convert()
-        self.move_history.set_colorkey(self.TRANS)
-        self.move_history.fill(self.TRANS)
-        for j, move in enumerate(self.model.move_history):
-            self.move_history_group.add(MoveHistoryText((0+80,j*20+10), "{}. {} {} from {}".format(
-                j+1,
+    def add_move_to_history(self):
+        """Displays the most recent move in the move history"""
+        move_number = len(self.model.move_history)
+        move = self.model.move_history[move_number-1]
+        move_text = MoveHistoryText(
+            ((self.spaces*self.space_size)+(self.board_x_offset*2)+80, move_number*20+30),
+            "{}. {} {} from {}".format(
+                move_number,
                 move[0].name,
                 move[1].name,
-                move[2])))
-        self.move_history_group.draw(self.move_history)
+                move[2]))
+        move_text.add(self.all_sprites_group, self.move_history_group)
 
     def show_direction_indicator(self, size):
         legal_moves = [move for move in self.possible_moves if move[1] == self.move_direction]
@@ -319,6 +323,7 @@ class NativeView(v.ViewInterface):
                         point = self.model.robots_location[self.move_robot.robot_object]
                         self.move_robot.set_destination(self.board_cell_to_pixel(point))
                         self.desired_move = None
+                        self.add_move_to_history()
                 self.move_robot = None
                 self.is_dragging = False
                 self.move_direction = None
@@ -354,11 +359,7 @@ class NativeView(v.ViewInterface):
         self.all_sprites_group.draw(self.gameplay)
         self.screen.blit(self.gameplay, (0,0))
         pygame.display.update() 
-        
-        self.show_move_history()
-        self.screen.blit(self.move_history, (700,40))
-        pygame.display.update()
-        
+
     def quit(self):
         """Clean up assets and unload graphic objects"""
         pygame.quit()
