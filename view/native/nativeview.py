@@ -3,7 +3,7 @@ from view import viewinterface as v
 from model.primative import Point, Shared
 import pygame, os, sys, math, time
 from pygame.locals import *
-from model.core import PPMoveStatus
+from model.core import State, PPMoveStatus
 
 class Robot(pygame.sprite.Sprite):
     robot_object = None
@@ -78,7 +78,7 @@ class Grid(pygame.sprite.Sprite):
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
-        pygame.draw.line(self.image, NativeView.BLACK, start, end, 1)
+        pygame.draw.line(self.image, NativeView.GRAY, start, end, 1)
 
 class MovesBorder(pygame.sprite.Sprite):
     def __init__(self, color, position, size):
@@ -114,6 +114,20 @@ class MoveHistoryText(pygame.sprite.Sprite):
         textpos.centerx = 80
         self.image.blit(text, textpos)
 
+class DisplayText(pygame.sprite.Sprite):
+    def __init__(self, length, height, position, display_text):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface([length, height]).convert()
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.TRANS)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        font = pygame.font.Font(None, 22)
+        text = font.render(display_text, 1, NativeView.BLACK, NativeView.WHITE)
+        textpos = text.get_rect()
+        textpos.centerx = length/2
+        self.image.blit(text, textpos)
+
 class NativeView(v.ViewInterface):
     """Leverage pygame framework for drawing of primative objects"""
     #Core
@@ -133,12 +147,13 @@ class NativeView(v.ViewInterface):
     is_dragging = False
     desired_move = None
     #Groups
-    all_sprites_group = pygame.sprite.Group()
+    all_sprites_group = pygame.sprite.LayeredUpdates()
     wall_group = pygame.sprite.Group()
     robot_group = pygame.sprite.Group()
     possible_moves_group = pygame.sprite.Group()
     direction_indicator = None
-    move_history_group = pygame.sprite.Group()
+    move_history_group = pygame.sprite.LayeredUpdates()
+    solution_group = pygame.sprite.Group()
     #RGB Colors
     BLACK = (  0,   0,   0)
     WHITE = (255, 255, 255)
@@ -155,6 +170,7 @@ class NativeView(v.ViewInterface):
     board_y_offset = 40
     spaces = 16
     space_size = 40 #16 spaces at 40px = 640x640 board
+    board_size = spaces * space_size
 
     def init(self, model):
         """Initialize screen"""
@@ -169,7 +185,12 @@ class NativeView(v.ViewInterface):
         self.gameplay.set_colorkey(self.TRANS)
         self.gameplay.fill(self.TRANS)
         self.screen.blit(self.background, (0,0))
+        self.draw_level()
 
+    def draw_level(self):
+        """Creates the display sprites for a new level"""
+        for sprite in self.all_sprites_group:
+            sprite.kill()
         #Create the grid
         size = self.spaces * self.space_size
         for i in range (1,self.spaces):
@@ -241,6 +262,29 @@ class NativeView(v.ViewInterface):
             "Move History")
         text.add(self.all_sprites_group)
 
+        #Goal display heading
+        text = DisplayText(
+            self.board_size,
+            self.board_y_offset,
+            ((self.board_size/2) + self.board_x_offset, self.board_y_offset),
+            "Goal {} of {}: move {} to cell ({}, {})".format(
+                self.model.goal_index+1,
+                len(self.model.board_section.goals),
+                " or ".join([robot.name for robot in goal.robots]),
+                goal.point.x,
+                goal.point.y))
+        text.add(self.all_sprites_group)
+
+        #Control display headings
+        headings = ["Controls:", "U for Undo", "N for New game", "R for Reset level", "S for Solve"]
+        for n, command in enumerate(headings):
+            text = DisplayText(
+                200,
+                self.board_y_offset,
+                (1000, self.board_y_offset + (n*self.board_y_offset)),
+                command)
+            text.add(self.all_sprites_group)
+
     def board_cell_to_pixel(self, point):
         """Given point for board, return the center point pixels in an x,y tuple"""
         return(point.x * self.space_size + (self.space_size / 2) + self.board_x_offset,
@@ -256,6 +300,12 @@ class NativeView(v.ViewInterface):
             return Shared.W
         elif 35 >= degrees or degrees >= 325:
             return Shared.S
+
+    def robot_object_to_sprite(self, robot):
+        """Given robot object, return sprite representing that robot"""
+        sprite = [bot for bot in self.robot_group if bot.robot_object == robot]
+        if len(sprite) > 0:
+            return sprite[0]
 
     def show_possible_moves(self, position, size):
         """Displays possible moves for selected robot"""
@@ -349,16 +399,85 @@ class NativeView(v.ViewInterface):
                 for sprite in self.all_sprites_group:
                     print(sprite)
 
-    def update(self):
-        pass
+            elif event.type == KEYDOWN and event.key == K_u:
+                """Undo"""
+                move_count = len(self.model.move_history)
+                if move_count > 0:
+                    self.move_robot = self.robot_object_to_sprite(self.model.move_history[move_count-1][0])
+                    self.model.move_undo()
+                    point = self.model.robots_location[self.move_robot.robot_object]
+                    self.move_robot.set_destination(self.board_cell_to_pixel(point))
+                    self.move_robot = None
+                    self.move_history_group.get_top_sprite().kill()
 
+            elif event.type == KEYDOWN and event.key == K_n:
+                """New Game"""
+                self.model.game_new()
+                self.draw_level()
+
+            elif event.type == KEYDOWN and event.key == K_r:
+                """Restart Level"""
+                self.model.level_restart()
+                self.draw_level()
+
+            elif event.type == KEYDOWN and event.key == K_s:
+                """Run the solver"""
+                for sprite in self.solution_group:
+                    sprite.kill()
+                directions = []
+                for robot_location in self.model.robots_location:
+                    lastmove = self.model.move_history_by_robot(robot_location)
+                    directions.append(0 if lastmove is None else lastmove[1].value)
+                answer = self.model.solver.generate(
+                    self.model.robots_location,
+                    self.model.goal(),
+                    directions,
+                    True)
+                if answer is not None:
+                    text = DisplayText(
+                        500,
+                        self.board_y_offset,
+                        (1000, 250 + self.board_y_offset),
+                        "Solution:")
+                    text.add(self.all_sprites_group, self.solution_group)
+                    bots = [robot.name for robot in self.model.solver.robot_objects]
+                    last_move = []
+                    for i, move in enumerate(answer):
+                        current_move = []
+                        for n, robot in enumerate(move):
+                            if i == 0:
+                                last_move.append((bots[n], robot[1]))
+                            current_move.append((bots[n], robot[1]))
+                        for z, next_move in enumerate(current_move):
+                            if next_move[1] != last_move[z][1]:
+                                for d in Shared.DIRECTIONS:
+                                    if next_move[1] == d.value:
+                                        move_display = "{}. {} {}".format(i, next_move[0], d.name)
+                                        text = DisplayText(
+                                            500,
+                                            self.board_y_offset,
+                                            (1000, 250 + (i*self.board_y_offset/2) + self.board_y_offset),
+                                            move_display)
+                                        text.add(self.all_sprites_group, self.solution_group)
+                        last_move = current_move                    
+                return
+
+    def update(self):
+        if self.model.game_state == State.level_complete:
+            self.model.level_new()
+            self.draw_level()
+
+        if self.model.game_state == State.game_complete:
+            self.model.game_new()
+            self.draw_level()
+            
     def display(self):
         """Blit everything to the screen"""
         self.gameplay.fill(self.WHITE)
         self.all_sprites_group.update()
         self.all_sprites_group.draw(self.gameplay)
         self.screen.blit(self.gameplay, (0,0))
-        pygame.display.update() 
+        pygame.display.update()
 
     def quit(self):
         """Clean up assets and unload graphic objects"""
