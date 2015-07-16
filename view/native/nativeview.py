@@ -1,7 +1,7 @@
 """View for native graphics like lines, circles, and rectangles"""
 from view import viewinterface as v
 from model.primative import Point, Shared
-import pygame, os, sys, math, time
+import pygame, os, sys, math, time, random
 from pygame.locals import *
 from model.core import State, PPMoveStatus
 
@@ -11,6 +11,7 @@ class Robot(pygame.sprite.Sprite):
     animation_duration = 1.0
     start_point = None
     destination = None
+    is_moving = False
 
     def __init__(self, position, robot_object, size):
         pygame.sprite.Sprite.__init__(self)
@@ -31,6 +32,7 @@ class Robot(pygame.sprite.Sprite):
         """Set destination x,y based off self.robot_object"""
         self.destination = point
         self.animation_start_time = time.clock()
+        self.is_moving = True
 
     def update(self):
         """updates the robot's location if a move is initiated"""    
@@ -47,21 +49,39 @@ class Robot(pygame.sprite.Sprite):
                 self.destination = None
                 self.animation_start_time = None
                 self.start_point = (self.x, self.y)
+                for sprite in NativeView.wall_group:
+                    sprite.robot_move_completed = True
+                self.is_moving = False
             self.rect.center = (self.x, self.y)
 
 class Wall(pygame.sprite.Sprite):
+    start_point = None
+    robot_move_completed = False
+
     def __init__(self, direction, position, length):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.Surface([length+2,length+2])
         self.image.set_colorkey(NativeView.TRANS)
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
-        self.rect.center = position
+        self.start_point = position
+        self.rect.center = self.start_point
         if direction == Shared.W.value:
             pygame.draw.line(self.image, NativeView.BLACK, [0,0], [0,length], 4)
         elif direction == Shared.S.value:
             pygame.draw.line(self.image, NativeView.BLACK, [0,length], [length,length], 4)
 
+    def update(self):
+        """shakes the walls after a robot moves"""
+        self.rect.center = self.start_point
+        if self.robot_move_completed == True:
+            random_x = random.randint(-2,2)
+            random_y = random.randint(-2,2)
+            self.x = self.rect.center[0] + random_x
+            self.y = self.rect.center[1] + random_y
+            self.rect.center = (self.x, self.y)
+            self.robot_move_completed = False
+        
 class Goal(pygame.sprite.Sprite):
     def __init__(self, color, position, size):
         pygame.sprite.Sprite.__init__(self)
@@ -239,6 +259,14 @@ class NativeView(v.ViewInterface):
                         self.space_size)
                     wall_S.add(self.all_sprites_group, self.wall_group)
 
+        #Create the goal
+        goal = self.model.goal()
+        color = goal.robots[0].rgbcolor()
+        self.all_sprites_group.add(Goal(
+            color,
+            self.board_cell_to_pixel(goal.point),
+            self.space_size))
+
         #Create the robots
         for r in self.model.robots_location:
             point = self.model.robots_location[r]
@@ -247,14 +275,6 @@ class NativeView(v.ViewInterface):
                 r,
                 self.space_size)
             robot.add(self.all_sprites_group, self.robot_group)
-
-        #Create the goal
-        goal = self.model.goal()
-        color = goal.robots[0].rgbcolor()
-        self.all_sprites_group.add(Goal(
-            color,
-            self.board_cell_to_pixel(goal.point),
-            self.space_size))
 
         #Move history heading
         text = MoveHistoryText(
@@ -310,7 +330,7 @@ class NativeView(v.ViewInterface):
     def show_possible_moves(self, position, size):
         """Displays possible moves for selected robot"""
         self.possible_moves = None
-        robot = [robot for robot in self.robot_group if robot.rect.collidepoint(position)]
+        robot = [robot for robot in self.robot_group if not robot.is_moving and robot.rect.collidepoint(position)]
         if len(robot) == 1:
             self.robot_clicked = True
             self.move_robot = robot[0]
@@ -395,20 +415,18 @@ class NativeView(v.ViewInterface):
             elif event.type == pygame.QUIT:
                 self.quit()
 
-            elif event.type == KEYDOWN and event.key == K_SPACE:
-                for sprite in self.all_sprites_group:
-                    print(sprite)
-
             elif event.type == KEYDOWN and event.key == K_u:
                 """Undo"""
-                move_count = len(self.model.move_history)
-                if move_count > 0:
-                    self.move_robot = self.robot_object_to_sprite(self.model.move_history[move_count-1][0])
-                    self.model.move_undo()
-                    point = self.model.robots_location[self.move_robot.robot_object]
-                    self.move_robot.set_destination(self.board_cell_to_pixel(point))
-                    self.move_robot = None
-                    self.move_history_group.get_top_sprite().kill()
+                robots = [robot for robot in self.robot_group if robot.is_moving]
+                if len(robots) == 0:
+                    move_count = len(self.model.move_history)
+                    if move_count > 0:
+                        self.move_robot = self.robot_object_to_sprite(self.model.move_history[move_count-1][0])
+                        self.model.move_undo()
+                        point = self.model.robots_location[self.move_robot.robot_object]
+                        self.move_robot.set_destination(self.board_cell_to_pixel(point))
+                        self.move_robot = None
+                        self.move_history_group.get_top_sprite().kill()
 
             elif event.type == KEYDOWN and event.key == K_n:
                 """New Game"""
@@ -431,8 +449,7 @@ class NativeView(v.ViewInterface):
                 answer = self.model.solver.generate(
                     self.model.robots_location,
                     self.model.goal(),
-                    directions,
-                    True)
+                    directions)
                 if answer is not None:
                     text = DisplayText(
                         500,
@@ -463,13 +480,14 @@ class NativeView(v.ViewInterface):
                 return
 
     def update(self):
-        if self.model.game_state == State.level_complete:
-            self.model.level_new()
-            self.draw_level()
-
-        if self.model.game_state == State.game_complete:
-            self.model.game_new()
-            self.draw_level()
+        robots = [robot for robot in self.robot_group if robot.is_moving]
+        if len(robots) == 0:
+            if self.model.game_state == State.level_complete:
+                self.model.level_new()
+                self.draw_level()
+            if self.model.game_state == State.game_complete:
+                self.model.game_new()
+                self.draw_level()
             
     def display(self):
         """Blit everything to the screen"""
