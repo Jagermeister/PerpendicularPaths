@@ -2,7 +2,8 @@
 from view import viewinterface as v
 import os
 import copy
-from ctypes import c_ulong, windll
+if os.name == 'nt':
+    from ctypes import c_ulong, windll
 from model.core import State, PPMoveStatus
 from model.primative import Point, Shared
 

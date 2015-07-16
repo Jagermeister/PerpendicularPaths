@@ -10,9 +10,10 @@ class Robot(object):
         self.name = name
         assert isinstance(value, int)
         self.value = value
-
-    def __str__(self):
-        return self.name
+        
+    def __str__(self): 
+        """debug output of name"""
+        return self.name.rjust(6)
 
     def __deepcopy__(self, memo):
         return self
@@ -37,3 +38,13 @@ class Robot(object):
             return 14 if os.name == 'nt' else 33
         elif self.value == 0b10000000:
             return 10 if os.name == 'nt' else 32
+
+    def rgbcolor(self):
+        if self.value == 0b00010000:
+            return (255,0,0)
+        elif self.value == 0b00100000:
+            return (0,0,255)
+        elif self.value == 0b01000000:
+            return (255,255,0)
+        elif self.value == 0b10000000:
+            return (0,255,0)
