@@ -111,27 +111,50 @@ class MovesBorder(pygame.sprite.Sprite):
         pygame.draw.rect(self.image, color, (0,0,size,size), 3)
 
 class DirectionIndicator(pygame.sprite.Sprite):
-    def __init__(self, position, start, end):
+    def __init__(self, direction, start, end):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.Surface(position)
+        direction_width = abs(start[0] - end[0])
+        direction_height = abs(start[1] - end[1])
+        if not direction_width:
+            direction_width = 40
+        if not direction_height:
+            direction_height = 40
+        print ("start: {} end: {}; w: {} h: {}; center: {}, {}".format(
+                start,
+                end,
+                direction_width,
+                direction_height,
+                (start[0] + end[0])/2,
+                (start[1] + end[1])/2
+            ))
+        self.image = pygame.Surface([direction_width, direction_height])
         self.image.set_colorkey(NativeView.TRANS)
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
-        self.rect.center = (position[0]/2,position[1]/2)
-        pygame.draw.line(self.image, NativeView.PURPLE, start, end, 3)
+        self.rect.center = ((start[0] + end[0])/2,(start[1] + end[1])/2)
+        #pygame.draw.line(self.image, NativeView.PURPLE, start, end, 3)
+
+        if direction == Shared.NORTH or direction == Shared.SOUTH:
+            pygame.draw.line(self.image, NativeView.PURPLE,
+                (direction_width/2, 0),
+                (direction_width/2, direction_height), 3)
+        else:
+            pygame.draw.line(self.image, NativeView.PURPLE,
+                (0, direction_height/2),
+                (direction_width, direction_height/2), 3)
 
 class MoveHistoryText(pygame.sprite.Sprite):
-    def __init__(self, position, display_text):
+    def __init__(self, width, position, display_text):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.Surface([160, 20]).convert()
+        self.image = pygame.Surface([width, 22]).convert()
         self.image.set_colorkey(NativeView.TRANS)
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
-        font = pygame.font.Font(None, 16)
+        font = pygame.font.SysFont("Courier New", 22)
         text = font.render(display_text, 1, NativeView.BLACK, NativeView.WHITE)
         textpos = text.get_rect()
-        textpos.centerx = 80
+        textpos.left = width/4
         self.image.blit(text, textpos)
 
 class DisplayText(pygame.sprite.Sprite):
@@ -142,10 +165,28 @@ class DisplayText(pygame.sprite.Sprite):
         self.image.fill(NativeView.TRANS)
         self.rect = self.image.get_rect()
         self.rect.center = position
-        font = pygame.font.Font(None, 22)
+        font = pygame.font.SysFont("Courier New", 22)
         text = font.render(display_text, 1, NativeView.BLACK, NativeView.WHITE)
         textpos = text.get_rect()
         textpos.centerx = length/2
+        self.image.blit(text, textpos)
+
+class DisplayButton(pygame.sprite.Sprite):
+    action = None
+    def __init__(self, position, text, color, action):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface([130, 50]).convert()
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(color)
+        self.action = action
+        pygame.draw.rect(self.image, NativeView.BLACK, (0, 0, 130, 50), 3)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        font = pygame.font.SysFont("Courier New", 18, True)
+        font.set_bold
+        text = font.render(text, 1, NativeView.BLACK, color)
+        textpos = text.get_rect()
+        textpos.center = (65, 25)
         self.image.blit(text, textpos)
 
 class NativeView(v.ViewInterface):
@@ -174,6 +215,7 @@ class NativeView(v.ViewInterface):
     direction_indicator = None
     move_history_group = pygame.sprite.LayeredUpdates()
     solution_group = pygame.sprite.Group()
+    button_group = pygame.sprite.Group()
     #RGB Colors
     BLACK = (  0,   0,   0)
     WHITE = (255, 255, 255)
@@ -277,33 +319,47 @@ class NativeView(v.ViewInterface):
             robot.add(self.all_sprites_group, self.robot_group)
 
         #Move history heading
-        text = MoveHistoryText(
-            ((self.spaces*self.space_size)+(self.board_x_offset*2)+80, 30),
+        width_end_of_board = self.spaces * self.space_size + self.board_x_offset
+        text = DisplayText(
+            width_end_of_board, 22,
+            (width_end_of_board + (self.width - width_end_of_board)/2,
+                self.board_y_offset/2),
             "Move History")
         text.add(self.all_sprites_group)
 
         #Goal display heading
         text = DisplayText(
             self.board_size,
-            self.board_y_offset,
-            ((self.board_size/2) + self.board_x_offset, self.board_y_offset),
-            "Goal {} of {}: move {} to cell ({}, {})".format(
+            22,
+            ((self.board_size/2) + self.board_x_offset, self.board_y_offset/2),
+            "Goal {} of {}: move {} to ({}, {})".format(
                 self.model.goal_index+1,
                 len(self.model.board_section.goals),
-                " or ".join([robot.name for robot in goal.robots]),
+                "/".join([robot.name for robot in goal.robots]),
                 goal.point.x,
                 goal.point.y))
         text.add(self.all_sprites_group)
 
-        #Control display headings
-        headings = ["Controls:", "U for Undo", "N for New game", "R for Reset level", "S for Solve"]
-        for n, command in enumerate(headings):
-            text = DisplayText(
-                200,
-                self.board_y_offset,
-                (1000, self.board_y_offset + (n*self.board_y_offset)),
-                command)
-            text.add(self.all_sprites_group)
+        undo_button = DisplayButton(
+            (self.spaces * self.space_size + self.board_x_offset * 3/2 + 65 + 150 * 0,
+            self.spaces * self.space_size + self.board_y_offset - 25),
+            "[U]ndo Move", self.RED, self.action_undo_move)
+        undo_button.add(self.button_group, self.all_sprites_group)
+        new_game_button = DisplayButton(
+            (self.spaces * self.space_size + self.board_x_offset * 3/2 + 65 + 150 * 1,
+            self.spaces * self.space_size + self.board_y_offset - 25),
+            "[N]ew Game", self.BLUE, self.action_new_game)
+        new_game_button.add(self.button_group, self.all_sprites_group)
+        restart_button = DisplayButton(
+            (self.spaces * self.space_size + self.board_x_offset * 3/2 + 65 + 150 * 2,
+            self.spaces * self.space_size + self.board_y_offset - 25),
+            "[R]estart", self.GREEN, self.action_restart_level)
+        restart_button.add(self.button_group, self.all_sprites_group)
+        solve_button = DisplayButton(
+            (self.spaces * self.space_size + self.board_x_offset * 3/2 + 65 + 150 * 3,
+            self.spaces * self.space_size + self.board_y_offset - 25),
+            "[S]olve", self.YELLOW, self.action_solve)
+        solve_button.add(self.button_group, self.all_sprites_group)
 
     def board_cell_to_pixel(self, point):
         """Given point for board, return the center point pixels in an x,y tuple"""
@@ -350,14 +406,24 @@ class NativeView(v.ViewInterface):
         """Displays the most recent move in the move history"""
         move_number = len(self.model.move_history)
         move = self.model.move_history[move_number-1]
-        move_text = MoveHistoryText(
-            ((self.spaces*self.space_size)+(self.board_x_offset*2)+80, move_number*20+30),
-            "{}. {} {} from {}".format(
+        width_end_of_board = self.spaces * self.space_size + self.board_x_offset
+        move_text = MoveHistoryText(width_end_of_board,
+            (width_end_of_board + (self.width - width_end_of_board)/2,
+                self.board_y_offset/2 + move_number * 22),
+            "{:0>2d}. {} {} from ({:0>2d}, {:0>2d})".format(
                 move_number,
-                move[0].name,
-                move[1].name,
-                move[2]))
+                move[0],
+                move[1],
+                move[2].x,
+                move[2].y))
         move_text.add(self.all_sprites_group, self.move_history_group)
+        if len(self.model.move_history) == 25:
+            move_limit_warning = DisplayText(
+                (self.width - width_end_of_board), 22,
+            (width_end_of_board + (self.width - width_end_of_board)/2,
+                self.board_y_offset/2 + (move_number + 1) * 22),
+            "Maximum moves for level attempt!!")
+            move_limit_warning.add(self.all_sprites_group, self.move_history_group)
 
     def show_direction_indicator(self, size):
         legal_moves = [move for move in self.possible_moves if move[1] == self.move_direction]
@@ -369,10 +435,72 @@ class NativeView(v.ViewInterface):
             if self.direction_indicator is not None:
                 self.direction_indicator.kill()
             self.direction_indicator = DirectionIndicator(
-                (self.width,self.height),
+                self.desired_move,
                 self.move_robot.rect.center,
                 move_direction_end)
             self.all_sprites_group.add(self.direction_indicator)
+
+    #GAME ACTIONS
+    def action_undo_move(self):
+        robots = [robot for robot in self.robot_group if robot.is_moving]
+        if len(robots) == 0:
+            move_count = len(self.model.move_history)
+            if move_count > 0:
+                self.move_robot = self.robot_object_to_sprite(self.model.move_history[move_count-1][0])
+                self.model.move_undo()
+                point = self.model.robots_location[self.move_robot.robot_object]
+                self.move_robot.set_destination(self.board_cell_to_pixel(point))
+                self.move_robot = None
+                self.move_history_group.get_top_sprite().kill()
+            if move_count == 25:
+                self.move_history_group.get_top_sprite().kill()
+
+    def action_new_game(self):
+        self.model.game_new()
+        self.draw_level()
+
+    def action_restart_level(self):
+        self.model.level_restart()
+        self.draw_level()
+
+    def action_solve(self):
+        for sprite in self.solution_group:
+            sprite.kill()
+        directions = []
+        for robot_location in self.model.robots_location:
+            lastmove = self.model.move_history_by_robot(robot_location)
+            directions.append(0 if lastmove is None else lastmove[1].value)
+        answer = self.model.solver.generate(
+            self.model.robots_location,
+            self.model.goal(),
+            directions)
+        if answer is not None:
+            text = DisplayText(
+                500,
+                self.board_y_offset,
+                (1000, 250 + self.board_y_offset),
+                "Solution:")
+            text.add(self.all_sprites_group, self.solution_group)
+            bots = [robot.name for robot in self.model.solver.robot_objects]
+            last_move = []
+            for i, move in enumerate(answer):
+                current_move = []
+                for n, robot in enumerate(move):
+                    if i == 0:
+                        last_move.append((bots[n], robot[1]))
+                    current_move.append((bots[n], robot[1]))
+                for z, next_move in enumerate(current_move):
+                    if next_move[1] != last_move[z][1]:
+                        for d in Shared.DIRECTIONS:
+                            if next_move[1] == d.value:
+                                move_display = "{}. {} {}".format(i, next_move[0], d.name)
+                                text = DisplayText(
+                                    500,
+                                    self.board_y_offset,
+                                    (1000, 250 + (i*self.board_y_offset/2) + self.board_y_offset),
+                                    move_display)
+                                text.add(self.all_sprites_group, self.solution_group)
+                last_move = current_move
 
     def handle_events(self):
         """Translate user input to model actions"""
@@ -382,8 +510,11 @@ class NativeView(v.ViewInterface):
             if event.type == MOUSEBUTTONDOWN and event.button == 1:
                 #left click
                 self.click_x, self.click_y = event.pos
-                self.show_possible_moves((self.click_x,self.click_y), self.space_size)
-
+                for button in self.button_group:
+                    if button.action and button.rect.collidepoint((self.click_x,self.click_y)):
+                        button.action()
+                if len(self.model.move_history) < 25:
+                    self.show_possible_moves((self.click_x,self.click_y), self.space_size)
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 #release left click
                 self.hide_possible_moves()
@@ -399,7 +530,6 @@ class NativeView(v.ViewInterface):
                 self.move_direction = None
                 if self.direction_indicator is not None:
                     self.direction_indicator.kill()
-
             elif event.type == MOUSEMOTION and event.buttons[0] == 1 and self.move_robot is not None:
                 #left click on a robot and drag
                 self.is_dragging = True
@@ -411,73 +541,16 @@ class NativeView(v.ViewInterface):
                 degrees = (90 - ((rad*180) / math.pi)) % 360
                 self.move_direction = self.degrees_to_direction(degrees)
                 self.show_direction_indicator(NativeView.space_size)
-
             elif event.type == pygame.QUIT:
                 self.quit()
-
             elif event.type == KEYDOWN and event.key == K_u:
-                """Undo"""
-                robots = [robot for robot in self.robot_group if robot.is_moving]
-                if len(robots) == 0:
-                    move_count = len(self.model.move_history)
-                    if move_count > 0:
-                        self.move_robot = self.robot_object_to_sprite(self.model.move_history[move_count-1][0])
-                        self.model.move_undo()
-                        point = self.model.robots_location[self.move_robot.robot_object]
-                        self.move_robot.set_destination(self.board_cell_to_pixel(point))
-                        self.move_robot = None
-                        self.move_history_group.get_top_sprite().kill()
-
+                self.action_undo_move()
             elif event.type == KEYDOWN and event.key == K_n:
-                """New Game"""
-                self.model.game_new()
-                self.draw_level()
-
+                self.action_new_game()
             elif event.type == KEYDOWN and event.key == K_r:
-                """Restart Level"""
-                self.model.level_restart()
-                self.draw_level()
-
+                self.action_restart_level()
             elif event.type == KEYDOWN and event.key == K_s:
-                """Run the solver"""
-                for sprite in self.solution_group:
-                    sprite.kill()
-                directions = []
-                for robot_location in self.model.robots_location:
-                    lastmove = self.model.move_history_by_robot(robot_location)
-                    directions.append(0 if lastmove is None else lastmove[1].value)
-                answer = self.model.solver.generate(
-                    self.model.robots_location,
-                    self.model.goal(),
-                    directions)
-                if answer is not None:
-                    text = DisplayText(
-                        500,
-                        self.board_y_offset,
-                        (1000, 250 + self.board_y_offset),
-                        "Solution:")
-                    text.add(self.all_sprites_group, self.solution_group)
-                    bots = [robot.name for robot in self.model.solver.robot_objects]
-                    last_move = []
-                    for i, move in enumerate(answer):
-                        current_move = []
-                        for n, robot in enumerate(move):
-                            if i == 0:
-                                last_move.append((bots[n], robot[1]))
-                            current_move.append((bots[n], robot[1]))
-                        for z, next_move in enumerate(current_move):
-                            if next_move[1] != last_move[z][1]:
-                                for d in Shared.DIRECTIONS:
-                                    if next_move[1] == d.value:
-                                        move_display = "{}. {} {}".format(i, next_move[0], d.name)
-                                        text = DisplayText(
-                                            500,
-                                            self.board_y_offset,
-                                            (1000, 250 + (i*self.board_y_offset/2) + self.board_y_offset),
-                                            move_display)
-                                        text.add(self.all_sprites_group, self.solution_group)
-                        last_move = current_move                    
-                return
+                self.action_solve()
 
     def update(self):
         robots = [robot for robot in self.robot_group if robot.is_moving]
