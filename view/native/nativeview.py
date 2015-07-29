@@ -1,7 +1,7 @@
 """View for native graphics like lines, circles, and rectangles"""
 from view import viewinterface as v
 from model.primative import Point, Shared
-import pygame, os, sys, math, time, random
+import pygame, os, sys, math, time, random, copy
 from pygame.locals import *
 from model.core import State, PPMoveStatus
 
@@ -189,6 +189,21 @@ class DisplayButton(pygame.sprite.Sprite):
         textpos.center = (65, 25)
         self.image.blit(text, textpos)
 
+class MovePath(pygame.sprite.Sprite):
+    def __init__(self, position, size, color, new_id):
+        pygame.sprite.Sprite.__init__(self)
+        self.new_id = new_id
+        self.image = pygame.Surface([size,size])
+        self.image.set_colorkey(NativeView.TRANS)
+        self.image.fill(NativeView.TRANS)
+        self.rect = self.image.get_rect()
+        self.rect.center = position
+        pygame.draw.circle(
+            self.image,
+            color,
+            (int(size/2), int(size/2)),
+            int(size/3), 0)
+
 class NativeView(v.ViewInterface):
     """Leverage pygame framework for drawing of primative objects"""
     #Core
@@ -216,6 +231,7 @@ class NativeView(v.ViewInterface):
     move_history_group = pygame.sprite.LayeredUpdates()
     solution_group = pygame.sprite.Group()
     button_group = pygame.sprite.Group()
+    move_path_group = pygame.sprite.Group()
     #RGB Colors
     BLACK = (  0,   0,   0)
     WHITE = (255, 255, 255)
@@ -425,6 +441,21 @@ class NativeView(v.ViewInterface):
             "Maximum moves for level attempt!!")
             move_limit_warning.add(self.all_sprites_group, self.move_history_group)
 
+    def space_touched_add_move(self, move):
+        """move = (robot, direction, old cell, new cell)"""
+        new_id = len(self.model.move_history)
+        color = move[0].rgbcolor()
+        direction = move[1]
+        cell = copy.copy(move[2])
+        while cell != move[3]:
+            space_touched = MovePath(
+                ((cell.x*self.space_size)+(self.board_x_offset*1.5), (cell.y*self.space_size)+(self.board_y_offset*1.5)),
+                10,
+                color,
+                new_id) #position, size, color
+            space_touched.add(self.all_sprites_group, self.move_path_group)
+            cell.move(direction)
+
     def show_direction_indicator(self, size):
         legal_moves = [move for move in self.possible_moves if move[1] == self.move_direction]
         if legal_moves: 
@@ -452,6 +483,9 @@ class NativeView(v.ViewInterface):
                 self.move_robot.set_destination(self.board_cell_to_pixel(point))
                 self.move_robot = None
                 self.move_history_group.get_top_sprite().kill()
+                for sprite in self.move_path_group:
+                    if sprite.new_id == move_count:
+                        sprite.kill()
             if move_count == 25:
                 self.move_history_group.get_top_sprite().kill()
 
@@ -525,6 +559,7 @@ class NativeView(v.ViewInterface):
                         self.move_robot.set_destination(self.board_cell_to_pixel(point))
                         self.desired_move = None
                         self.add_move_to_history()
+                        self.space_touched_add_move(self.model.move_history[-1])
                 self.move_robot = None
                 self.is_dragging = False
                 self.move_direction = None
