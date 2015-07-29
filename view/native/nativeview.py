@@ -8,10 +8,12 @@ from model.core import State, PPMoveStatus
 class Robot(pygame.sprite.Sprite):
     robot_object = None
     animation_start_time = None
-    animation_duration = 1.0
+    animation_duration = None
+    shake_time_percentage = 0.96
     start_point = None
     destination = None
     is_moving = False
+    should_shake = False
 
     def __init__(self, position, robot_object, size):
         pygame.sprite.Sprite.__init__(self)
@@ -28,16 +30,23 @@ class Robot(pygame.sprite.Sprite):
             (int(size/2), int(size/2)),
             int(size/3), 0)
 
-    def set_destination(self, point):
+    def set_final_destination(self, point, distance):
         """Set destination x,y based off self.robot_object"""
+        self.animation_duration = (1.0 / 16) * distance
+            # 1.0 seconds / 16 spaces * amount of spaces to move
         self.destination = point
         self.animation_start_time = time.clock()
         self.is_moving = True
+        self.should_shake = True
 
     def update(self):
         """updates the robot's location if a move is initiated"""    
         if self.destination:
             elapsed_percentage = (time.clock() - self.animation_start_time) / self.animation_duration
+            if self.should_shake and elapsed_percentage > shake_time_percentage:
+                self.should_shake = False
+                for sprite in NativeView.wall_group:
+                    sprite.robot_move_completed = True
             if elapsed_percentage < 1.0:
                 self.dx = self.destination[0] - self.start_point[0]
                 self.dy = self.destination[1] - self.start_point[1]
@@ -49,8 +58,6 @@ class Robot(pygame.sprite.Sprite):
                 self.destination = None
                 self.animation_start_time = None
                 self.start_point = (self.x, self.y)
-                for sprite in NativeView.wall_group:
-                    sprite.robot_move_completed = True
                 self.is_moving = False
             self.rect.center = (self.x, self.y)
 
@@ -119,14 +126,6 @@ class DirectionIndicator(pygame.sprite.Sprite):
             direction_width = 40
         if not direction_height:
             direction_height = 40
-        print ("start: {} end: {}; w: {} h: {}; center: {}, {}".format(
-                start,
-                end,
-                direction_width,
-                direction_height,
-                (start[0] + end[0])/2,
-                (start[1] + end[1])/2
-            ))
         self.image = pygame.Surface([direction_width, direction_height])
         self.image.set_colorkey(NativeView.TRANS)
         self.image.fill(NativeView.TRANS)
@@ -478,9 +477,11 @@ class NativeView(v.ViewInterface):
             move_count = len(self.model.move_history)
             if move_count > 0:
                 self.move_robot = self.robot_object_to_sprite(self.model.move_history[move_count-1][0])
+                start_position = self.model.robots_location[self.move_robot.robot_object]
                 self.model.move_undo()
                 point = self.model.robots_location[self.move_robot.robot_object]
-                self.move_robot.set_destination(self.board_cell_to_pixel(point))
+                distance = abs(start_position.x - point.x + start_position.y - point.y)
+                self.move_robot.set_final_destination(self.board_cell_to_pixel(point), distance)
                 self.move_robot = None
                 self.move_history_group.get_top_sprite().kill()
                 for sprite in self.move_path_group:
@@ -553,10 +554,12 @@ class NativeView(v.ViewInterface):
                 #release left click
                 self.hide_possible_moves()
                 if self.desired_move is not None:
+                    start_position = self.model.robots_location[self.move_robot.robot_object]
                     move_result = self.model.robot_move(self.move_robot.robot_object, self.desired_move)
                     if move_result == PPMoveStatus.MOVE_SUCCESS:
                         point = self.model.robots_location[self.move_robot.robot_object]
-                        self.move_robot.set_destination(self.board_cell_to_pixel(point))
+                        distance = abs(start_position.x - point.x + start_position.y - point.y)
+                        self.move_robot.set_final_destination(self.board_cell_to_pixel(point), distance)
                         self.desired_move = None
                         self.add_move_to_history()
                         self.space_touched_add_move(self.model.move_history[-1])
