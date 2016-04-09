@@ -31,7 +31,7 @@ class SolutionGenerator(object):
                 break
             advanced_index = index + self.direction_delta[direction] # space attempting to move onto
             for robot in node: # FIND OUT WHAT NODE IS
-                if advanced_index == robot[0]: # and is not equal to any non-goal robot! Is this is?
+                if advanced_index == robot[0]:
                     break
             else:
                 index = advanced_index
@@ -94,8 +94,8 @@ class SolutionGenerator(object):
         #reorder our robots - put the goal robot last @ [3]
         goal_index = goal.point.y * self.board_width + goal.point.x
         minx = maxx = miny = maxy = None
-        for direction in self.directions:
-            if self.board[goal_index] & self.direction_reverse[direction.value]: # If goal index & direction reverse is not 0. This doesn't run if the goal index is the same as the reversed direction
+        for direction in self.directions: # find what walls are on the goal, so you know what direction you need to come from. then min and max distance in that direction depending on walls. If a goal robot lands wihtin range of x or y then puzzle is solved
+            if self.board[goal_index] & self.direction_reverse[direction.value]: # This checks what direction walls are on the goal and what move is needed to get here
                 new_cell = self.cell_move(goal_index, direction.value, [])
                 if new_cell != goal_index:
                     if direction.value in (Shared.E.value, Shared.W.value):
@@ -103,7 +103,7 @@ class SolutionGenerator(object):
                         maxx = new_cell if new_cell > goal_index else goal_index
                     elif direction.value in (Shared.N.value, Shared.S.value):#NorS
                         miny = new_cell if new_cell < goal_index else goal_index
-                        maxy = new_cell if new_cell > goal_index else goal_index
+                        maxy = new_cell if new_cell > goal_index else goal_index 
         if miny is not None:
             minymod = miny % self.board_width
         positions_seen = {}
@@ -128,7 +128,7 @@ class SolutionGenerator(object):
                 total_seen_count += seen_count
                 seen_count = 0
             seen_count += 1
-            if (goal_index == node[3][0] #This is when the goal robot is lined up with the goal
+            if (goal_index == node[3][0] #This is when the goal robot is on the goal? 
                 or (
                     minx is not None and
                     maxx is not None and
@@ -137,7 +137,7 @@ class SolutionGenerator(object):
                     ((node[3][1] in (Shared.N.value, Shared.S.value) and maxx >= node[3][0] >= minx) or (
                         node[3][1] in (Shared.E.value, Shared.W.value) and 
                         maxy >= node[3][0] >= miny and 
-                        node[3][0] % self.board_width == minymod)))):
+                        node[3][0] % self.board_width == minymod)))): # This is when it is lined up with the goal, with no walls blocking it. We need a check that the path is clear!
 # EEK This only works when we know our goal will have the backstops
                 total_seen_count += seen_count
                 if verbose:
