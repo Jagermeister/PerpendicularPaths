@@ -43,7 +43,7 @@ class Robot(pygame.sprite.Sprite):
         """updates the robot's location if a move is initiated"""    
         if self.destination:
             elapsed_percentage = (time.clock() - self.animation_start_time) / self.animation_duration
-            if self.should_shake and elapsed_percentage > shake_time_percentage:
+            if self.should_shake and elapsed_percentage > self.shake_time_percentage:
                 self.should_shake = False
                 for sprite in NativeView.wall_group:
                     sprite.robot_move_completed = True

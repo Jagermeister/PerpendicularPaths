@@ -11,7 +11,7 @@ class SolutionGenerator(object):
 
     def __init__(self, boardsection, robots, directions):
         self.board_width = boardsection.width
-        self.board = list(itertools.chain.from_iterable(boardsection._board))
+        self.board = list(itertools.chain.from_iterable(boardsection._board)) # list of each space. Binary of walls on space
         self.robot_objects = copy.deepcopy(robots)
         self.directions = directions
         self.direction_reverse = {
@@ -27,11 +27,11 @@ class SolutionGenerator(object):
 
     def cell_move(self, index, direction, node):
         while True:
-            if self.board[index] & direction == direction:
+            if self.board[index] & direction == direction: # if space at this index has a wall blocking the path, stop movement
                 break
-            advanced_index = index + self.direction_delta[direction]
-            for robot in node:
-                if advanced_index == robot[0]:
+            advanced_index = index + self.direction_delta[direction] # space attempting to move onto
+            for robot in node: # FIND OUT WHAT NODE IS
+                if advanced_index == robot[0]: # and is not equal to any non-goal robot! Is this is?
                     break
             else:
                 index = advanced_index
@@ -83,7 +83,7 @@ class SolutionGenerator(object):
             if robot.value == goal.robots[0].value:
                 self.robot_objects.append(self.robot_objects.pop(i))
                 break
-        start_position = list(
+        start_position = list( #This is needs to be understood
             [(robots[robot].y * self.board_width + robots[robot].x, directions[ii])
              for i, robot_template
              in enumerate(self.robot_objects)
@@ -95,7 +95,7 @@ class SolutionGenerator(object):
         goal_index = goal.point.y * self.board_width + goal.point.x
         minx = maxx = miny = maxy = None
         for direction in self.directions:
-            if self.board[goal_index] & self.direction_reverse[direction.value]:
+            if self.board[goal_index] & self.direction_reverse[direction.value]: # If goal index & direction reverse is not 0. This doesn't run if the goal index is the same as the reversed direction
                 new_cell = self.cell_move(goal_index, direction.value, [])
                 if new_cell != goal_index:
                     if direction.value in (Shared.E.value, Shared.W.value):
@@ -107,16 +107,16 @@ class SolutionGenerator(object):
         if miny is not None:
             minymod = miny % self.board_width
         positions_seen = {}
-        #directary of seen positions
+        #directory of seen positions
         path_length = 1
         total_seen_count = 0
         seen_count = 0
         skipped_count = 0
-        queue = deque()
-        queue.append([start_position])
+        queue = deque() # Creates a left to right queue
+        queue.append([start_position]) # adds the start_position list to the queue
         while queue:
-            path = queue.popleft()
-            node = path[-1]
+            path = queue.popleft() #pops the location that was at index 0
+            node = path[-1] # Find out what is in path to know what this index points to. What was popped from queue? an element from start position. 
             if len(path) != path_length:
                 if verbose:
                     print("{0:02d} - {1:05d}\t sk: {2:05d}\t@ {3}s".format(
@@ -128,7 +128,7 @@ class SolutionGenerator(object):
                 total_seen_count += seen_count
                 seen_count = 0
             seen_count += 1
-            if (goal_index == node[3][0]
+            if (goal_index == node[3][0] #This is when the goal robot is lined up with the goal
                 or (
                     minx is not None and
                     maxx is not None and
@@ -147,7 +147,7 @@ class SolutionGenerator(object):
                         total_seen_count,
                         skipped_count,
                         len(positions_seen)))
-                return path
+                return path # This is the end, a solution has been found
             for adjacent in self.moves_from_robots(node, goal_index):
                 first = adjacent[0][0]
                 second = adjacent[1][0]
