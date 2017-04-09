@@ -2,8 +2,11 @@
 A puzzle game where you need to find the shortest path while only moving perpendicular off obstacles. You have 4 movable, color coded pieces. A goal is displayed that is colored the same as one of your peices. Your objective is to move the piece that matches the goal's color to that space. Movement is made in linear directions, but pieces will continue to move until they are obstructed by a wall or another piece. There are multiple solutions to each puzzle, but moves are recorded and the least amount of moves is optimal.<br>
 <img src="https://github.com/betterin30days/PerpendicularPaths/blob/master/perppath.gif"/><br>
 
-# How to run tests
+# How to run unit tests
 `python -m unittest discover -v`
+
+# How to run end to end tests
+`python endtoend.py`
 
 # Displays
 This project was written in Python 3 and can use two seperate display interfaces that are both supported by Windows and Mac. There is a terminal view to allow a text-based command prompt/line display. Pygame is used to create a interactive, click-drag display with graphical effects. These interfaces are switched by editing line 2 of config.ini in the model/config directory. Use "native" for the pygame view and "terminal" for the terminal view.<br>
