@@ -254,7 +254,7 @@ class PerpendicularPaths:
                 boards = sections[0]
                 boards = [boards[i:i+2] for i in range(0, len(boards), 2)]
 
-            if len(sections) > 1 and len(sections) % 5 == 0:
+            if len(sections) > 1:
                 robots = sections[1]
                 robots = [(
                     Shared.robot_by_name(robots[i:i+1]),
