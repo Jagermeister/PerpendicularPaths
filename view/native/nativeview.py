@@ -544,6 +544,7 @@ class NativeView(v.ViewInterface):
         for event in pygame.event.get():
             if event.type == MOUSEBUTTONDOWN and event.button == 1:
                 #left click
+                #print(event) #<Event(5-MouseButtonDown {'button': 1, 'pos': (373, 407)})>
                 self.click_x, self.click_y = event.pos
                 for button in self.button_group:
                     if button.action and button.rect.collidepoint((self.click_x,self.click_y)):
@@ -552,6 +553,7 @@ class NativeView(v.ViewInterface):
                     self.show_possible_moves((self.click_x,self.click_y), self.space_size)
             elif event.type == MOUSEBUTTONUP and event.button == 1:
                 #release left click
+                #print(event) #<Event(6-MouseButtonUp {'pos': (625, 292), 'button': 1})>
                 self.hide_possible_moves()
                 if self.desired_move is not None:
                     start_position = self.model.robots_location[self.move_robot.robot_object]
@@ -570,9 +572,11 @@ class NativeView(v.ViewInterface):
                     self.direction_indicator.kill()
             elif event.type == MOUSEMOTION and event.buttons[0] == 1 and self.move_robot is not None:
                 #left click on a robot and drag
+                #print(event) #<Event(4-MouseMotion {'pos': (583, 295), 'rel': (0, -1), 'buttons': (1, 0, 0)})>
                 self.is_dragging = True
                 self.desired_move = None
-                relative_position = pygame.mouse.get_pos()
+                #relative_position = pygame.mouse.get_pos() # event allows easier testing
+                relative_position = event.pos
                 dy = float(relative_position[1] - self.click_y)
                 dx = float(relative_position[0] - self.click_x)
                 rad = math.atan2(dy,dx)
